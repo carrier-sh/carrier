@@ -1,0 +1,103 @@
+{
+  "id": "research",
+  "description": "Comprehensive research fleet for gathering, analyzing, and synthesizing information from diverse sources",
+  "agent": "fleet-manager",
+  "inputs": [
+    {
+      "type": "user_prompt",
+      "source": "user"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "result.md",
+      "type": "fleet_result"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "search-specialist",
+      "description": "Conduct comprehensive searches across multiple sources",
+      "agent": "search-specialist.md",
+      "inputs": [
+        {
+          "type": "user_prompt",
+          "source": "user"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "search_results.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "data-researcher",
+          "condition": "success"
+        }
+      ],
+      "approval_required": false
+    },
+    {
+      "id": "data-researcher",
+      "description": "Analyze and process data from search results",
+      "agent": "data-researcher.md",
+      "inputs": [
+        {
+          "type": "file",
+          "source": "search_results.md"
+        },
+        {
+          "type": "user_prompt",
+          "source": "user"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "data_analysis.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "research-analyst",
+          "condition": "success"
+        }
+      ],
+      "approval_required": false
+    },
+    {
+      "id": "research-analyst",
+      "description": "Synthesize findings and generate comprehensive insights",
+      "agent": "research-analyst.md",
+      "inputs": [
+        {
+          "type": "file",
+          "source": "search_results.md"
+        },
+        {
+          "type": "file",
+          "source": "data_analysis.md"
+        },
+        {
+          "type": "user_prompt",
+          "source": "user"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "FINAL.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "complete",
+          "condition": "success"
+        }
+      ],
+      "approval_required": false
+    }
+  ]
+}

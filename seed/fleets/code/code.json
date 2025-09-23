@@ -1,0 +1,104 @@
+{
+  "id": "code",
+  "description": "Minimal fleet for implementing code changes efficiently",
+  "agent": "fleet-manager",
+  "inputs": [
+    {
+      "type": "user_prompt",
+      "source": "user"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "result.md",
+      "type": "fleet_result"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "code-analyzer",
+      "description": "Analyze codebase and plan implementation",
+      "agent": "code-analyzer.md",
+      "inputs": [
+        {
+          "type": "user_prompt",
+          "source": "user"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "analysis.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "code-executor",
+          "condition": "success"
+        }
+      ],
+      "approval_required": false
+    },
+    {
+      "id": "code-executor",
+      "description": "Execute code changes",
+      "agent": "code-executor.md",
+      "inputs": [
+        {
+          "type": "file",
+          "source": "analysis.md"
+        },
+        {
+          "type": "user_prompt",
+          "source": "user"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "implementation.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "quality-verifier",
+          "condition": "success"
+        }
+      ],
+      "approval_required": false
+    },
+    {
+      "id": "quality-verifier",
+      "description": "Verify implementation quality",
+      "agent": "quality-verifier.md",
+      "inputs": [
+        {
+          "type": "file",
+          "source": "implementation.md"
+        },
+        {
+          "type": "file",
+          "source": "analysis.md"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "FINAL.md",
+          "type": "file"
+        }
+      ],
+      "nextTasks": [
+        {
+          "taskId": "complete",
+          "condition": "all_pass"
+        },
+        {
+          "taskId": "code-executor",
+          "condition": "failures",
+          "context": "failed_verification"
+        }
+      ],
+      "approval_required": false
+    }
+  ]
+}

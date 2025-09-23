@@ -1,0 +1,18 @@
+# Bun configuration for fast test execution
+
+[test]
+# Run tests in parallel for speed
+parallelism = true
+
+# Fail fast on first test failure
+bail = false
+
+# Test timeout (ms)
+timeout = 5000
+
+# Coverage settings
+coverage = false
+coverageThreshold = 80
+
+# Watch mode settings
+watchMode = false
