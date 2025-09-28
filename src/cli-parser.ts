@@ -165,6 +165,7 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   deploy: [
+    { name: 'background', description: 'Run task in background mode' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   approve: [
@@ -204,6 +205,10 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'global', description: 'Uninstall global installation', shorthand: 'g' },
     { name: 'all', description: 'Uninstall both local and global installations', shorthand: 'a' },
     { name: 'force', description: 'Skip confirmation prompt', shorthand: 'f' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  execute: [
+    { name: 'background', description: 'Run task in background mode' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   'execute-task': [

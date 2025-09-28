@@ -14,13 +14,13 @@ export class ClaudeProvider implements AIProvider {
   async executeTask(config: TaskConfig): Promise<TaskResult> {
     return new Promise((resolve) => {
       const command = this.buildCommand(config);
-      
+
       const child = spawn('claude', command, {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { 
-          ...process.env, 
-          CARRIER_TASK_ID: config.taskId, 
-          CARRIER_DEPLOYED_ID: config.deployedId 
+        stdio: 'inherit', // Use inherit for interactive mode
+        env: {
+          ...process.env,
+          CARRIER_TASK_ID: config.taskId,
+          CARRIER_DEPLOYED_ID: config.deployedId
         }
       });
 
@@ -75,21 +75,9 @@ export class ClaudeProvider implements AIProvider {
   }
 
   buildCommand(config: TaskConfig): string[] {
-    const command = ['-p']; // Use print mode for non-interactive execution
-    
-    // Add model selection based on agent type
-    const model = config.model || this.getDefaultModel(config.agentType);
-    command.push('--model', model);
-    
-    // Set max turns for agent complexity
-    const maxTurns = config.maxTurns || this.getMaxTurnsForAgent(config.agentType);
-    command.push('--max-turns', maxTurns.toString());
-    
-    // Build the full prompt with agent context
+    // For interactive mode, just pass the prompt directly
     const fullPrompt = this.buildAgentPrompt(config);
-    command.push(fullPrompt);
-    
-    return command;
+    return [fullPrompt];
   }
 
   async getAvailableModels(): Promise<string[]> {
@@ -142,12 +130,8 @@ export class ClaudeProvider implements AIProvider {
   }
 
   private buildAgentPrompt(config: TaskConfig): string {
-    // In a more sophisticated implementation, this would load agent templates
-    // For now, return the basic prompt with output path instructions
-    return `${config.prompt}
-
-Output File Path: .carrier/deployed/${config.deployedId}/outputs/${config.taskId}.md
-
-IMPORTANT: You MUST write your output to the exact path specified above.`;
+    // The prompt from TaskExecutor already contains full context
+    // Just return it as-is since it's already enhanced
+    return config.prompt;
   }
 }
