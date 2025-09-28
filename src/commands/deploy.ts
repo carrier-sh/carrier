@@ -35,7 +35,7 @@ export async function deploy(
       console.log(`✓ Fleet deployed: ${result.data.id}`);
       console.log(`  Status: ${result.data.status}`);
       console.log(`  Current task: ${result.data.currentTask}`);
-      console.log(`\nUse "carrier status ${result.data.id}" to monitor progress`);
+      console.log(`\nUse "carrier status ${result.data.id}" to check progress`);
     } else {
       console.error(`Deployment failed: ${result.error}`);
       process.exit(1);

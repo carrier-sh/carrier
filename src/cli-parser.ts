@@ -176,10 +176,6 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'json', description: 'Output status in JSON format' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
-  monitor: [
-    { name: 'refresh', description: 'Auto-refresh interval in seconds', shorthand: 'r' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
   ls: [
     { name: 'remote', description: 'List remote fleets from API', shorthand: 'r' },
     { name: 'testing', description: 'List fleets from testing folder' },

@@ -116,7 +116,7 @@ export async function status(
       if (deployed.status === 'awaiting_approval') {
         console.log(`\n⚠️  Action Required: Run 'carrier approve ${deployed.id}' to continue`);
       } else if (deployed.status === 'active') {
-        console.log(`\n▶️  Fleet is running. Monitor with: carrier monitor ${deployed.id}`);
+        console.log(`\n▶️  Fleet is running. Check status with: carrier status ${deployed.id}`);
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

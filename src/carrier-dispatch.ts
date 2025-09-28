@@ -72,7 +72,6 @@ if (command) {
   console.log('  carrier status');
   console.log('  carrier config');
   console.log('  carrier approve');
-  console.log('  carrier monitor');
   console.log('');
   console.log('Or just type your request to auto-deploy!');
 }

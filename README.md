@@ -58,9 +58,6 @@ carrier ls
 # Deploy a fleet with your request
 carrier deploy simple-code-change "Add error handling to the login function"
 
-# Monitor execution
-carrier monitor
-
 # Check status
 carrier status
 ```
@@ -129,9 +126,6 @@ carrier deploy <fleet-id> "<your request>"
 
 # Approve pending tasks
 carrier approve [deployed-id]
-
-# Monitor active deployments
-carrier monitor [deployed-id]
 
 # Check deployment status
 carrier status [deployed-id]
@@ -232,7 +226,6 @@ bun run test:watch
 | `carrier deploy <fleet-id> <request>` | Deploy fleet with request |
 | `carrier approve [deployed-id]` | Approve pending task |
 | `carrier status [deployed-id]` | View deployment status |
-| `carrier monitor [deployed-id]` | Monitor active execution |
 | **System** | |
 | `carrier init [--global] [--no-claude]` | Initialize Carrier |
 | `carrier config` | Show configuration |
