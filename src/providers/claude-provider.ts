@@ -4,6 +4,8 @@
  */
 
 import { spawn, ChildProcess } from 'child_process';
+import { writeFileSync, appendFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { AIProvider, TaskConfig, TaskResult, ProviderConfig } from './provider-interface.js';
 import { CarrierCore } from '../core.js';
 
@@ -208,6 +210,9 @@ export class ClaudeProvider implements AIProvider {
     try {
       const prompt = this.buildEnhancedPrompt(config);
 
+      // Create session log file
+      const sessionLogPath = this.createSessionLogFile(config);
+
       // Create SDK session
       const session = query({
         prompt,
@@ -221,10 +226,23 @@ export class ClaudeProvider implements AIProvider {
       });
 
       let output = '';
+      let sessionLog = '';
       let completed = false;
 
-      // Process the session stream
+      console.log(`📝 Session log: ${sessionLogPath}`);
+      console.log(`\n--- Claude Session Start ---\n`);
+
+      // Process the session stream with full logging
       for await (const message of session) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${message.type.toUpperCase()}: ${message.content || 'No content'}\n`;
+
+        // Add to session log
+        sessionLog += logEntry;
+
+        // Write to log file in real-time
+        this.appendToSessionLog(sessionLogPath, logEntry);
+
         switch (message.type) {
           case 'system':
             console.log(`🔧 ${message.content}`);
@@ -232,24 +250,35 @@ export class ClaudeProvider implements AIProvider {
           case 'assistant':
             if (message.content) {
               output += message.content;
-              // Show progress for first part
-              if (output.length < 200) {
-                process.stdout.write(message.content);
-              }
+              // Stream ALL assistant content to user in real-time
+              process.stdout.write(message.content);
             }
             break;
           case 'result':
             completed = true;
-            console.log('\n✅ Task execution completed');
+            console.log('\n\n--- Claude Session End ---');
+            console.log('✅ Task execution completed');
             break;
+          case 'user':
+            if (message.content) {
+              console.log(`\n👤 User: ${message.content}`);
+            }
+            break;
+          default:
+            console.log(`📋 ${message.type}: ${message.content || 'No content'}`);
         }
       }
 
       if (completed) {
-        // Save task output if core is available
+        // Save both the final output and session log
         if (this.core) {
           this.core.saveTaskOutput(config.deployedId, config.taskId, output);
+          this.saveSessionLog(config, sessionLog);
         }
+
+        console.log(`\n📊 Session Summary:`);
+        console.log(`   Output length: ${output.length} characters`);
+        console.log(`   Session log: ${sessionLogPath}`);
 
         return {
           success: true,
@@ -257,6 +286,11 @@ export class ClaudeProvider implements AIProvider {
           exitCode: 0
         };
       } else {
+        // Save partial session log even on failure
+        if (this.core) {
+          this.saveSessionLog(config, sessionLog);
+        }
+
         return {
           success: false,
           error: 'Task did not complete properly',
@@ -677,5 +711,81 @@ Execute this task now and provide the results.`;
       timeout: 300,
       executable: 'claude'
     };
+  }
+
+  /**
+   * Create session log file and return path
+   */
+  private createSessionLogFile(config: TaskConfig): string {
+    if (!this.core) {
+      return '';
+    }
+
+    const carrierPath = this.core['carrierPath'];
+    const logsDir = join(carrierPath, 'deployed', config.deployedId, 'logs');
+    const sessionLogPath = join(logsDir, `${config.taskId}-session.log`);
+
+    // Create logs directory if it doesn't exist
+    mkdirSync(logsDir, { recursive: true });
+
+    // Initialize log file with header
+    const header = `# Claude Session Log
+Task: ${config.taskId}
+Deployment: ${config.deployedId}
+Agent: ${config.agentType}
+Started: ${new Date().toISOString()}
+Model: ${this.options.model}
+
+=== SESSION START ===
+
+`;
+
+    writeFileSync(sessionLogPath, header);
+    return sessionLogPath;
+  }
+
+  /**
+   * Append to session log file in real-time
+   */
+  private appendToSessionLog(logPath: string, content: string): void {
+    if (logPath) {
+      try {
+        appendFileSync(logPath, content);
+      } catch (error) {
+        console.warn(`Failed to write to session log: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  /**
+   * Save complete session log
+   */
+  private saveSessionLog(config: TaskConfig, sessionLog: string): void {
+    if (!this.core) {
+      return;
+    }
+
+    try {
+      const carrierPath = this.core['carrierPath'];
+      const sessionLogPath = join(carrierPath, 'deployed', config.deployedId, 'logs', `${config.taskId}-session-complete.log`);
+
+      const completeLog = `# Complete Claude Session Log
+Task: ${config.taskId}
+Deployment: ${config.deployedId}
+Agent: ${config.agentType}
+Completed: ${new Date().toISOString()}
+Model: ${this.options.model}
+
+=== COMPLETE SESSION ===
+
+${sessionLog}
+
+=== SESSION END ===
+`;
+
+      writeFileSync(sessionLogPath, completeLog);
+    } catch (error) {
+      console.warn(`Failed to save complete session log: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }

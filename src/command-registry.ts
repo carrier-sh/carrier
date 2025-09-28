@@ -198,6 +198,20 @@ export const COMMANDS: Record<string, Command> = {
     ],
     category: 'core',
     requiresInit: true
+  },
+
+  'watch-logs': {
+    name: 'watch-logs',
+    aliases: ['logs', 'watch'],
+    description: 'Watch session logs in real-time',
+    usage: 'carrier watch-logs <deployed-id> [task-id] [--list]',
+    examples: [
+      'carrier watch-logs 1 code-analyzer  # Watch specific task logs',
+      'carrier watch-logs 1 --list        # List available logs',
+      'carrier logs 1                     # List logs for deployment'
+    ],
+    category: 'core',
+    requiresInit: true
   }
 };
 

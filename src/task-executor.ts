@@ -193,6 +193,125 @@ export class TaskExecutor {
   }
 
   /**
+   * Watch session logs in real-time
+   */
+  async watchSessionLogs(deployedId: string, taskId: string): Promise<void> {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const carrierPath = this.core['carrierPath'];
+    const sessionLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}-session.log`);
+
+    console.log(`\n👁️  Watching session logs for task ${taskId}`);
+    console.log(`📝 Log file: ${sessionLogPath}`);
+    console.log(`Press Ctrl+C to stop watching\n`);
+
+    try {
+      // Check if log file exists
+      if (!fs.existsSync(sessionLogPath)) {
+        console.log(`⏳ Waiting for session log to be created...`);
+
+        // Wait for file to be created (with timeout)
+        let attempts = 0;
+        while (!fs.existsSync(sessionLogPath) && attempts < 30) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+        }
+
+        if (!fs.existsSync(sessionLogPath)) {
+          console.log(`❌ Session log file not found: ${sessionLogPath}`);
+          return;
+        }
+      }
+
+      console.log(`📖 Session log found, starting to watch...\n`);
+
+      // Watch file for changes and stream content
+      let lastSize = 0;
+      const watcher = fs.watchFile(sessionLogPath, { interval: 500 }, (curr, prev) => {
+        if (curr.size > lastSize) {
+          // Read new content
+          const stream = fs.createReadStream(sessionLogPath, {
+            start: lastSize,
+            end: curr.size
+          });
+
+          stream.on('data', (chunk) => {
+            process.stdout.write(chunk.toString());
+          });
+
+          lastSize = curr.size;
+        }
+      });
+
+      // Read existing content first
+      if (fs.existsSync(sessionLogPath)) {
+        const content = fs.readFileSync(sessionLogPath, 'utf-8');
+        if (content) {
+          console.log(content);
+          lastSize = content.length;
+        }
+      }
+
+      // Handle Ctrl+C to stop watching
+      process.on('SIGINT', () => {
+        console.log(`\n\n👋 Stopped watching session logs for task ${taskId}`);
+        fs.unwatchFile(sessionLogPath);
+        process.exit(0);
+      });
+
+      // Keep the process alive
+      await new Promise(() => {});
+
+    } catch (error) {
+      console.error(`Error watching session logs: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Show available session logs for a deployment
+   */
+  listSessionLogs(deployedId: string): void {
+    const fs = require('fs');
+    const path = require('path');
+
+    const carrierPath = this.core['carrierPath'];
+    const logsDir = path.join(carrierPath, 'deployed', deployedId, 'logs');
+
+    console.log(`\n📋 Session Logs for Deployment ${deployedId}:`);
+
+    try {
+      if (!fs.existsSync(logsDir)) {
+        console.log(`No logs directory found for deployment ${deployedId}`);
+        return;
+      }
+
+      const logFiles = fs.readdirSync(logsDir);
+
+      if (logFiles.length === 0) {
+        console.log(`No session logs found in ${logsDir}`);
+        return;
+      }
+
+      for (const file of logFiles) {
+        const filePath = path.join(logsDir, file);
+        const stats = fs.statSync(filePath);
+        const size = Math.round(stats.size / 1024);
+        const modified = stats.mtime.toLocaleString();
+
+        console.log(`  📄 ${file}`);
+        console.log(`     Size: ${size}KB, Modified: ${modified}`);
+        console.log(`     Path: ${filePath}\n`);
+      }
+
+      console.log(`💡 Use "carrier watch-logs ${deployedId} <task-id>" to watch logs in real-time`);
+
+    } catch (error) {
+      console.error(`Error listing session logs: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Show detailed provider status
    */
   async showProviderStatus(): Promise<void> {

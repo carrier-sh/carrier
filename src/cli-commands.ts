@@ -198,6 +198,10 @@ export class CLICommands {
     return commands.config(this.configManager, this.carrierPath, params);
   }
 
+  async watchLogs(params: string[]): Promise<void> {
+    return commands.watchLogs(this.carrier, params, this.carrierPath);
+  }
+
   // Helper methods that are still needed by init and other commands
   private async copySeedFiles(): Promise<void> {
     const seedPath = path.join(__dirname, '..', 'seed');

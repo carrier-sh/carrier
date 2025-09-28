@@ -14,3 +14,4 @@ export { help } from './help.js';
 export { uninstall } from './uninstall.js';
 export { fleet } from './fleet.js';
 export { clean } from './clean.js';
+export { watchLogs } from './watch-logs.js';
