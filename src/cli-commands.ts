@@ -79,7 +79,7 @@ export class CLICommands {
     }
 
     // Create subdirectories
-    const dirs = ['fleets', 'deployed', 'testing'];
+    const dirs = ['fleets', 'deployed'];
     dirs.forEach(dir => {
       const dirPath = path.join(this.carrierPath, dir);
       if (!fs.existsSync(dirPath)) {
