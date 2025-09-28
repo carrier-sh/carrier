@@ -9,14 +9,35 @@ import { join } from 'path';
 import { AIProvider, TaskConfig, TaskResult, ProviderConfig } from './provider-interface.js';
 import { CarrierCore } from '../core.js';
 
-// Type definitions for Claude SDK (simplified for demonstration)
+// Type definitions for Claude SDK (based on actual SDK documentation)
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
+export type HookEvent =
+  | 'PreToolUse'
+  | 'PostToolUse'
+  | 'Notification'
+  | 'UserPromptSubmit'
+  | 'SessionStart'
+  | 'SessionEnd'
+  | 'Stop'
+  | 'SubagentStop'
+  | 'PreCompact';
+
 export interface SDKMessage {
-  type: 'assistant' | 'user' | 'result' | 'system';
+  type: 'assistant' | 'user' | 'result' | 'system' | 'stream_event';
+  uuid?: string;
+  session_id?: string;
   content?: string;
   message?: any;
-  id?: string;
+  subtype?: string;
+  tools?: string[];
+  model?: string;
+  permissionMode?: PermissionMode;
+  duration_ms?: number;
+  total_cost_usd?: number;
+  usage?: any;
+  parent_tool_use_id?: string | null;
+  event?: any;
 }
 
 export interface Query extends AsyncGenerator<SDKMessage, void, unknown> {
@@ -43,13 +64,20 @@ export interface McpSdkServerConfigWithInstance {
   };
 }
 
+export interface HookCallbackMatcher {
+  matcher?: string;
+  hooks: Array<(input: any, toolUseID: string | undefined, options: { signal: AbortSignal }) => Promise<any>>;
+}
+
 export interface Options {
   cwd?: string;
   model?: string;
   permissionMode?: PermissionMode;
   mcpServers?: Record<string, any>;
   maxTurns?: number;
-  hooks?: any;
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
+  includePartialMessages?: boolean;
+  maxThinkingTokens?: number;
 }
 
 // Create chainable mock schema object
@@ -213,7 +241,10 @@ export class ClaudeProvider implements AIProvider {
       // Create session log file
       const sessionLogPath = this.createSessionLogFile(config);
 
-      // Create SDK session
+      // Build comprehensive hooks for maximum visibility
+      const hooks = this.buildComprehensiveHooks(config, sessionLogPath);
+
+      // Create SDK session with full visibility options
       const session = query({
         prompt,
         options: {
@@ -221,7 +252,10 @@ export class ClaudeProvider implements AIProvider {
           model: this.options.model,
           permissionMode: this.options.permissionMode,
           mcpServers: this.mcpServer ? { 'carrier-tools': this.mcpServer } : {},
-          maxTurns: config.maxTurns || 10
+          maxTurns: config.maxTurns || 10,
+          hooks,
+          includePartialMessages: true, // Enable detailed streaming
+          maxThinkingTokens: 50000 // Allow extensive thinking
         }
       });
 
@@ -232,10 +266,13 @@ export class ClaudeProvider implements AIProvider {
       console.log(`📝 Session log: ${sessionLogPath}`);
       console.log(`\n--- Claude Session Start ---\n`);
 
-      // Process the session stream with full logging
+      // Process the session stream with comprehensive logging
       for await (const message of session) {
         const timestamp = new Date().toISOString();
-        const logEntry = `[${timestamp}] ${message.type.toUpperCase()}: ${message.content || 'No content'}\n`;
+
+        // Format detailed message info
+        const messageInfo = this.formatMessageForLogging(message);
+        const logEntry = `[${timestamp}] ${messageInfo}\n`;
 
         // Add to session log
         sessionLog += logEntry;
@@ -243,29 +280,24 @@ export class ClaudeProvider implements AIProvider {
         // Write to log file in real-time
         this.appendToSessionLog(sessionLogPath, logEntry);
 
+        // Display to user based on message type
+        this.displayMessageToUser(message);
+
+        // Handle different message types
         switch (message.type) {
-          case 'system':
-            console.log(`🔧 ${message.content}`);
-            break;
           case 'assistant':
             if (message.content) {
               output += message.content;
-              // Stream ALL assistant content to user in real-time
-              process.stdout.write(message.content);
             }
             break;
           case 'result':
             completed = true;
-            console.log('\n\n--- Claude Session End ---');
-            console.log('✅ Task execution completed');
+            this.displaySessionSummary(message);
             break;
-          case 'user':
-            if (message.content) {
-              console.log(`\n👤 User: ${message.content}`);
-            }
+          case 'stream_event':
+            // Handle partial/streaming events for real-time updates
+            this.handleStreamEvent(message);
             break;
-          default:
-            console.log(`📋 ${message.type}: ${message.content || 'No content'}`);
         }
       }
 
@@ -786,6 +818,165 @@ ${sessionLog}
       writeFileSync(sessionLogPath, completeLog);
     } catch (error) {
       console.warn(`Failed to save complete session log: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Build comprehensive hooks for maximum session visibility
+   */
+  private buildComprehensiveHooks(config: TaskConfig, sessionLogPath: string): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
+    return {
+      PreToolUse: [{
+        hooks: [async (input: any, toolUseID: string | undefined) => {
+          const logEntry = `🔧 TOOL PRE-USE: ${input.tool_name}\n   Input: ${JSON.stringify(input.tool_input, null, 2)}\n   Tool ID: ${toolUseID}\n`;
+          console.log(`🔧 About to use tool: ${input.tool_name}`);
+          console.log(`   Parameters: ${JSON.stringify(input.tool_input, null, 2)}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      PostToolUse: [{
+        hooks: [async (input: any, toolUseID: string | undefined) => {
+          const logEntry = `✅ TOOL POST-USE: ${input.tool_name}\n   Response: ${JSON.stringify(input.tool_response, null, 2)}\n   Tool ID: ${toolUseID}\n`;
+          console.log(`✅ Tool completed: ${input.tool_name}`);
+          console.log(`   Response: ${JSON.stringify(input.tool_response, null, 2)}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      SessionStart: [{
+        hooks: [async (input: any) => {
+          const logEntry = `🚀 SESSION START: ${input.source || 'manual'}\n   Session ID: ${input.session_id}\n   CWD: ${input.cwd}\n   Permission Mode: ${input.permission_mode}\n`;
+          console.log(`🚀 Session starting...`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      SessionEnd: [{
+        hooks: [async (input: any) => {
+          const logEntry = `🏁 SESSION END: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n`;
+          console.log(`🏁 Session ended: ${input.reason || 'completed'}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      UserPromptSubmit: [{
+        hooks: [async (input: any) => {
+          const logEntry = `👤 USER PROMPT: ${input.prompt}\n`;
+          console.log(`👤 User prompt received`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      Notification: [{
+        hooks: [async (input: any) => {
+          const logEntry = `📬 NOTIFICATION: ${input.message}\n   Title: ${input.title || 'No title'}\n`;
+          console.log(`📬 ${input.title || 'Notification'}: ${input.message}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }]
+    };
+  }
+
+  /**
+   * Format message for detailed logging
+   */
+  private formatMessageForLogging(message: SDKMessage): string {
+    const baseInfo = `${message.type.toUpperCase()}`;
+
+    switch (message.type) {
+      case 'system':
+        return `${baseInfo} [${message.subtype || 'unknown'}]: ${message.tools?.length || 0} tools available, Model: ${message.model}, Permission: ${message.permissionMode}`;
+
+      case 'assistant':
+        const contentPreview = message.content ? message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '') : 'No content';
+        return `${baseInfo}: ${contentPreview}${message.parent_tool_use_id ? ` (Tool: ${message.parent_tool_use_id})` : ''}`;
+
+      case 'result':
+        return `${baseInfo} [${message.subtype || 'success'}]: Duration: ${message.duration_ms}ms, Cost: $${message.total_cost_usd || 0}`;
+
+      case 'stream_event':
+        return `${baseInfo}: ${JSON.stringify(message.event)}`;
+
+      case 'user':
+        return `${baseInfo}: ${message.content || 'No content'}`;
+
+      default:
+        return `${baseInfo}: ${JSON.stringify(message)}`;
+    }
+  }
+
+  /**
+   * Display message to user with appropriate formatting
+   */
+  private displayMessageToUser(message: SDKMessage): void {
+    switch (message.type) {
+      case 'system':
+        if (message.subtype === 'init') {
+          console.log(`🔧 System initialized - ${message.tools?.length || 0} tools, Model: ${message.model}`);
+        }
+        break;
+
+      case 'assistant':
+        if (message.content) {
+          process.stdout.write(message.content);
+        }
+        break;
+
+      case 'user':
+        if (message.content) {
+          console.log(`\n👤 User: ${message.content}`);
+        }
+        break;
+
+      case 'stream_event':
+        // Handle real-time streaming events
+        console.log(`📡 Stream: ${JSON.stringify(message.event)}`);
+        break;
+
+      default:
+        console.log(`📋 ${message.type}: ${message.content || 'Event occurred'}`);
+    }
+  }
+
+  /**
+   * Handle streaming events for real-time updates
+   */
+  private handleStreamEvent(message: SDKMessage): void {
+    if (message.event) {
+      // Process different types of streaming events
+      const eventType = message.event.type || 'unknown';
+      console.log(`📡 Streaming: ${eventType}`);
+
+      // Log detailed streaming information
+      const logEntry = `STREAMING EVENT: ${JSON.stringify(message.event, null, 2)}`;
+      // Could append to session log here if needed
+    }
+  }
+
+  /**
+   * Display session summary from result message
+   */
+  private displaySessionSummary(message: SDKMessage): void {
+    console.log('\n\n--- Claude Session End ---');
+    console.log('✅ Task execution completed');
+
+    if (message.duration_ms) {
+      console.log(`⏱️  Duration: ${message.duration_ms}ms`);
+    }
+
+    if (message.total_cost_usd) {
+      console.log(`💰 Cost: $${message.total_cost_usd}`);
+    }
+
+    if (message.usage) {
+      console.log(`📊 Token usage: ${JSON.stringify(message.usage)}`);
     }
   }
 }
