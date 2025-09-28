@@ -57,7 +57,6 @@ export async function ls(
   if (useRemote) {
     // List remote fleets
     try {
-      remoteFleetManager.setUseLocal(useTesting);
       const remoteFleets = await remoteFleetManager.list(true);
 
       if (remoteFleets.length === 0) {
