@@ -838,9 +838,12 @@ ${sessionLog}
 
       PostToolUse: [{
         hooks: [async (input: any, toolUseID: string | undefined) => {
-          const logEntry = `✅ TOOL POST-USE: ${input.tool_name}\n   Response: ${JSON.stringify(input.tool_response, null, 2)}\n   Tool ID: ${toolUseID}\n`;
+          const logEntry = `✅ TOOL POST-USE: ${input.tool_name}\n   Response: ${JSON.stringify(input.tool_response, null, 2)}\n   Tool ID: ${toolUseID}\n   Duration: ${input.duration_ms || 'unknown'}ms\n`;
           console.log(`✅ Tool completed: ${input.tool_name}`);
           console.log(`   Response: ${JSON.stringify(input.tool_response, null, 2)}`);
+          if (input.duration_ms) {
+            console.log(`   Duration: ${input.duration_ms}ms`);
+          }
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -848,8 +851,11 @@ ${sessionLog}
 
       SessionStart: [{
         hooks: [async (input: any) => {
-          const logEntry = `🚀 SESSION START: ${input.source || 'manual'}\n   Session ID: ${input.session_id}\n   CWD: ${input.cwd}\n   Permission Mode: ${input.permission_mode}\n`;
+          const logEntry = `🚀 SESSION START: ${input.source || 'manual'}\n   Session ID: ${input.session_id}\n   CWD: ${input.cwd}\n   Permission Mode: ${input.permission_mode}\n   Model: ${input.model}\n   Available Tools: ${input.tools ? input.tools.length : 0}\n`;
           console.log(`🚀 Session starting...`);
+          console.log(`   Session ID: ${input.session_id}`);
+          console.log(`   Model: ${input.model}`);
+          console.log(`   Available Tools: ${input.tools ? input.tools.length : 0}`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -857,8 +863,14 @@ ${sessionLog}
 
       SessionEnd: [{
         hooks: [async (input: any) => {
-          const logEntry = `🏁 SESSION END: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n`;
+          const logEntry = `🏁 SESSION END: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n   Duration: ${input.duration_ms || 'unknown'}ms\n   Total Cost: $${input.total_cost_usd || 0}\n`;
           console.log(`🏁 Session ended: ${input.reason || 'completed'}`);
+          if (input.duration_ms) {
+            console.log(`   Duration: ${input.duration_ms}ms`);
+          }
+          if (input.total_cost_usd) {
+            console.log(`   Total Cost: $${input.total_cost_usd}`);
+          }
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -866,8 +878,8 @@ ${sessionLog}
 
       UserPromptSubmit: [{
         hooks: [async (input: any) => {
-          const logEntry = `👤 USER PROMPT: ${input.prompt}\n`;
-          console.log(`👤 User prompt received`);
+          const logEntry = `👤 USER PROMPT: ${input.prompt}\n   Prompt Length: ${input.prompt ? input.prompt.length : 0} chars\n`;
+          console.log(`👤 User prompt received (${input.prompt ? input.prompt.length : 0} chars)`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -875,8 +887,35 @@ ${sessionLog}
 
       Notification: [{
         hooks: [async (input: any) => {
-          const logEntry = `📬 NOTIFICATION: ${input.message}\n   Title: ${input.title || 'No title'}\n`;
+          const logEntry = `📬 NOTIFICATION: ${input.message}\n   Title: ${input.title || 'No title'}\n   Type: ${input.type || 'unknown'}\n`;
           console.log(`📬 ${input.title || 'Notification'}: ${input.message}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      Stop: [{
+        hooks: [async (input: any) => {
+          const logEntry = `⛔ STOP: ${input.reason || 'manual stop'}\n   Session ID: ${input.session_id}\n`;
+          console.log(`⛔ Session stopped: ${input.reason || 'manual stop'}`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      SubagentStop: [{
+        hooks: [async (input: any) => {
+          const logEntry = `🔌 SUBAGENT STOP: ${input.subagent_type || 'unknown'}\n   Reason: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n`;
+          console.log(`🔌 Subagent stopped: ${input.subagent_type || 'unknown'} (${input.reason || 'completed'})`);
+          this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
+          return { continue: true };
+        }]
+      }],
+
+      PreCompact: [{
+        hooks: [async (input: any) => {
+          const logEntry = `🗜️ PRE-COMPACT: Starting context compaction\n   Messages before: ${input.messages_before || 'unknown'}\n   Session ID: ${input.session_id}\n`;
+          console.log(`🗜️ Compacting context: ${input.messages_before || 'unknown'} messages`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -892,23 +931,56 @@ ${sessionLog}
 
     switch (message.type) {
       case 'system':
-        return `${baseInfo} [${message.subtype || 'unknown'}]: ${message.tools?.length || 0} tools available, Model: ${message.model}, Permission: ${message.permissionMode}`;
+        const toolsList = message.tools ? message.tools.join(', ') : 'none';
+        return `${baseInfo} [${message.subtype || 'unknown'}]: ${message.tools?.length || 0} tools available (${toolsList}), Model: ${message.model}, Permission: ${message.permissionMode}`;
 
       case 'assistant':
-        const contentPreview = message.content ? message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '') : 'No content';
-        return `${baseInfo}: ${contentPreview}${message.parent_tool_use_id ? ` (Tool: ${message.parent_tool_use_id})` : ''}`;
+        const contentPreview = message.content ? message.content.substring(0, 200) + (message.content.length > 200 ? '...' : '') : 'No content';
+        let assistantInfo = `${baseInfo}: ${contentPreview}`;
+        if (message.parent_tool_use_id) {
+          assistantInfo += ` (Tool Response: ${message.parent_tool_use_id})`;
+        }
+        if (message.usage) {
+          assistantInfo += ` | Usage: ${JSON.stringify(message.usage)}`;
+        }
+        return assistantInfo;
 
       case 'result':
-        return `${baseInfo} [${message.subtype || 'success'}]: Duration: ${message.duration_ms}ms, Cost: $${message.total_cost_usd || 0}`;
+        let resultInfo = `${baseInfo} [${message.subtype || 'success'}]`;
+        if (message.duration_ms) {
+          resultInfo += ` Duration: ${message.duration_ms}ms`;
+        }
+        if (message.total_cost_usd) {
+          resultInfo += ` Cost: $${message.total_cost_usd}`;
+        }
+        if (message.usage) {
+          resultInfo += ` Usage: ${JSON.stringify(message.usage)}`;
+        }
+        return resultInfo;
 
       case 'stream_event':
-        return `${baseInfo}: ${JSON.stringify(message.event)}`;
+        const event = message.event || {};
+        const eventType = event.type || 'unknown';
+        let streamInfo = `${baseInfo} [${eventType}]`;
+
+        // Add specific details for different event types
+        if (event.thinking) {
+          streamInfo += ` Thinking: ${event.thinking.substring(0, 100)}${event.thinking.length > 100 ? '...' : ''}`;
+        }
+        if (event.tool_use) {
+          streamInfo += ` Tool: ${event.tool_use.name || 'unknown'}`;
+        }
+        if (event.file_operation) {
+          streamInfo += ` File: ${event.file_operation.type} ${event.file_operation.path || 'unknown'}`;
+        }
+
+        return streamInfo;
 
       case 'user':
-        return `${baseInfo}: ${message.content || 'No content'}`;
+        return `${baseInfo}: ${message.content || 'No content'} (${message.content?.length || 0} chars)`;
 
       default:
-        return `${baseInfo}: ${JSON.stringify(message)}`;
+        return `${baseInfo}: ${JSON.stringify(message, null, 2)}`;
     }
   }
 
@@ -920,6 +992,11 @@ ${sessionLog}
       case 'system':
         if (message.subtype === 'init') {
           console.log(`🔧 System initialized - ${message.tools?.length || 0} tools, Model: ${message.model}`);
+          if (message.tools && message.tools.length > 0) {
+            console.log(`   Available tools: ${message.tools.join(', ')}`);
+          }
+        } else {
+          console.log(`🔧 System ${message.subtype || 'event'}: ${message.content || 'No details'}`);
         }
         break;
 
@@ -927,21 +1004,68 @@ ${sessionLog}
         if (message.content) {
           process.stdout.write(message.content);
         }
+        // Show usage info if available
+        if (message.usage) {
+          console.log(`\n💾 Token usage: ${JSON.stringify(message.usage)}`);
+        }
         break;
 
       case 'user':
         if (message.content) {
-          console.log(`\n👤 User: ${message.content}`);
+          console.log(`\n👤 User: ${message.content} (${message.content.length} chars)`);
         }
         break;
 
       case 'stream_event':
-        // Handle real-time streaming events
-        console.log(`📡 Stream: ${JSON.stringify(message.event)}`);
+        const event = message.event || {};
+        const eventType = event.type || 'unknown';
+
+        switch (eventType) {
+          case 'thinking':
+            if (event.thinking) {
+              console.log(`🧠 Thinking: ${event.thinking.substring(0, 150)}${event.thinking.length > 150 ? '...' : ''}`);
+            }
+            break;
+
+          case 'tool_use':
+            if (event.tool_use) {
+              console.log(`🔧 Using tool: ${event.tool_use.name || 'unknown'}`);
+              if (event.tool_use.input) {
+                console.log(`   Input: ${JSON.stringify(event.tool_use.input, null, 2)}`);
+              }
+            }
+            break;
+
+          case 'file_operation':
+            if (event.file_operation) {
+              console.log(`📁 File ${event.file_operation.type}: ${event.file_operation.path || 'unknown'}`);
+            }
+            break;
+
+          case 'content_block_start':
+            console.log(`📝 Starting ${event.content_block?.type || 'content'} block`);
+            break;
+
+          case 'content_block_delta':
+            // Don't spam with deltas, just show we're receiving them
+            process.stdout.write('.');
+            break;
+
+          case 'content_block_stop':
+            console.log(`\n✅ Finished ${event.content_block?.type || 'content'} block`);
+            break;
+
+          default:
+            console.log(`📡 Stream [${eventType}]: ${JSON.stringify(event, null, 2)}`);
+        }
+        break;
+
+      case 'result':
+        // Don't display result here as it's handled in displaySessionSummary
         break;
 
       default:
-        console.log(`📋 ${message.type}: ${message.content || 'Event occurred'}`);
+        console.log(`📋 ${message.type}: ${message.content || JSON.stringify(message)}`);
     }
   }
 
@@ -950,13 +1074,63 @@ ${sessionLog}
    */
   private handleStreamEvent(message: SDKMessage): void {
     if (message.event) {
-      // Process different types of streaming events
-      const eventType = message.event.type || 'unknown';
-      console.log(`📡 Streaming: ${eventType}`);
+      const event = message.event;
+      const eventType = event.type || 'unknown';
 
-      // Log detailed streaming information
-      const logEntry = `STREAMING EVENT: ${JSON.stringify(message.event, null, 2)}`;
-      // Could append to session log here if needed
+      // Handle specific streaming event types with detailed visibility
+      switch (eventType) {
+        case 'thinking_start':
+          console.log(`🧠 Claude is thinking...`);
+          break;
+
+        case 'thinking_delta':
+          // Show thinking progress without overwhelming output
+          if (event.delta && event.delta.length > 0) {
+            process.stdout.write('💭');
+          }
+          break;
+
+        case 'thinking_stop':
+          console.log(`\n🧠 Thinking complete`);
+          break;
+
+        case 'tool_use_start':
+          console.log(`🔧 Starting tool: ${event.tool?.name || 'unknown'}`);
+          break;
+
+        case 'tool_use_delta':
+          // Show tool execution progress
+          process.stdout.write('⚙️');
+          break;
+
+        case 'tool_use_stop':
+          console.log(`\n🔧 Tool execution complete: ${event.tool?.name || 'unknown'}`);
+          break;
+
+        case 'message_start':
+          console.log(`📝 Message generation started`);
+          break;
+
+        case 'message_delta':
+          // Content streaming is handled elsewhere
+          break;
+
+        case 'message_stop':
+          console.log(`\n📝 Message generation complete`);
+          break;
+
+        case 'error':
+          console.error(`❌ Stream error: ${event.error?.message || 'Unknown error'}`);
+          break;
+
+        default:
+          // Log unknown streaming events for debugging
+          console.log(`📡 Stream [${eventType}]: ${JSON.stringify(event, null, 2)}`);
+      }
+
+      // Always log detailed streaming information to session log
+      const logEntry = `STREAMING EVENT [${eventType}]: ${JSON.stringify(event, null, 2)}`;
+      // Note: Session log appending would happen in the main message processing loop
     }
   }
 
