@@ -155,8 +155,6 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: false
   },
 
-  // Internal commands - not exposed to users
-
   fleet: {
     name: 'fleet',
     aliases: ['f'],

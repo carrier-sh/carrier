@@ -214,31 +214,8 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'wait', description: 'Wait for task to complete', shorthand: 'w' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
-  'task-status': [
-    { name: 'json', description: 'Output status in JSON format' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
-  'save-output': [
-    { name: 'content', description: 'Content to save as task output' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
-  'update-task': [
-    { name: 'status', description: 'New status for the task' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
-  'update-fleet': [
-    { name: 'status', description: 'New status for the fleet' },
-    { name: 'current-task', description: 'Current task being executed' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
-  'get-output': [
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
   fleet: [
     { name: 'json', description: 'Output fleet configuration in JSON format' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
-  'get-context': [
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   'clean': [

@@ -165,28 +165,9 @@ export class CLICommands {
     return commands.uninstall(this.carrierPath, this.isGlobal, params);
   }
 
-  async saveOutput(params: string[]): Promise<void> {
-    return commands.saveOutput(this.carrier, params);
-  }
-
-  async updateTask(params: string[]): Promise<void> {
-    return commands.updateTask(this.carrier, params);
-  }
-
-  async updateFleet(params: string[]): Promise<void> {
-    return commands.updateFleet(this.carrier, params);
-  }
-
-  async getOutput(params: string[]): Promise<void> {
-    return commands.getOutput(this.carrier, params);
-  }
 
   async fleet(params: string[]): Promise<void> {
     return commands.fleet(this.carrier, params);
-  }
-
-  async getContext(params: string[]): Promise<void> {
-    return commands.getContext(this.carrier, params);
   }
 
   async execute(params: string[]): Promise<void> {
@@ -195,10 +176,6 @@ export class CLICommands {
 
   async executeTask(params: string[]): Promise<void> {
     return commands.executeTask(this.carrier, params);
-  }
-
-  async taskStatus(params: string[]): Promise<void> {
-    return commands.taskStatus(this.carrierPath, params);
   }
 
   async clean(params: string[]): Promise<void> {

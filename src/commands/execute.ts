@@ -1,7 +1,6 @@
 import { spawn } from 'child_process';
 import { CarrierCore } from '../core.js';
 
-// Helper function to build Claude command
 function buildClaudeCommand(agentType: string, prompt: string, taskId: string, deployedId: string): string[] {
   const command = [
     '/Task',
