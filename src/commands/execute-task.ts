@@ -44,7 +44,7 @@ export async function executeTask(this: any, params: string[]): Promise<void> {
       child.unref();
       
       console.log(`Task ${taskId} launched in background (PID: ${child.pid})`);
-      console.log(`Monitor with: carrier task-status ${deployedId} ${taskId}`);
+      console.log(`Check status with: carrier task-status ${deployedId} ${taskId}`);
     } else {
       // Launch Claude CLI and wait for completion
       const child = spawn('claude', claudeCommand, {

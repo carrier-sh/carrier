@@ -104,7 +104,7 @@ Status: Fleet execution has been delegated to the fleet-manager
 The fleet-manager is now orchestrating the following tasks:
 {{fleetTasksOverview}}
 
-Monitor progress with: \`bun run carrier status ${deployedId}\`
+Check progress with: \`bun run carrier status ${deployedId}\`
 `);
 // Mark third todo as completed
 ```
