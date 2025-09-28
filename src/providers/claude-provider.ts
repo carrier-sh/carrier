@@ -5,6 +5,7 @@
 import { query, type SDKMessage, type PermissionMode } from '@anthropic-ai/claude-code';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createWriteStream, WriteStream } from 'fs';
 import {
   AIProvider,
   TaskConfig,
@@ -14,12 +15,21 @@ import {
   TokenUsage
 } from '../types/providers.js';
 
+interface LogEntry {
+  timestamp: string;
+  type: 'message' | 'tool_call' | 'tool_result' | 'thinking' | 'error' | 'system';
+  content: any;
+  metadata?: Record<string, any>;
+}
+
 export class ClaudeProvider implements AIProvider {
   readonly name = 'claude';
   readonly displayName = 'Claude AI';
   readonly version = '1.0.0';
 
   private options: ClaudeProviderOptions;
+  private logStream: WriteStream | null = null;
+  private logEntries: LogEntry[] = [];
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.options = {
@@ -50,6 +60,25 @@ export class ClaudeProvider implements AIProvider {
       // Create output directory for the task
       const outputPath = this.createOutputPath(config);
 
+      // Initialize logging infrastructure
+      const logPath = this.initializeLogging(config);
+      console.log(`📝 Logging to: ${logPath}`);
+      console.log('');
+
+      // Log initial task configuration
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'system',
+        content: {
+          event: 'task_start',
+          taskId: config.taskId,
+          agentType: config.agentType,
+          deployedId: config.deployedId,
+          model: config.model || this.options.model,
+          prompt: agentPrompt
+        }
+      });
+
       // Execute task using Claude SDK
       const conversation = query({
         prompt: agentPrompt,
@@ -64,6 +93,14 @@ export class ClaudeProvider implements AIProvider {
 
       // Process messages from the SDK
       for await (const message of conversation) {
+        // Log raw message
+        this.logEntry({
+          timestamp: new Date().toISOString(),
+          type: 'message',
+          content: message,
+          metadata: { messageType: message.type, subtype: (message as any).subtype }
+        });
+
         const updates = await this.processMessage(message, config, outputPath);
 
         if (updates.content) {
@@ -111,6 +148,24 @@ export class ClaudeProvider implements AIProvider {
 
       const duration = Date.now() - startTime;
 
+      // Log task completion
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'system',
+        content: {
+          event: 'task_complete',
+          success: taskCompleted,
+          duration: Math.round(duration / 1000),
+          totalTokens,
+          turnCount,
+          toolUseCount,
+          usage: finalUsage
+        }
+      });
+
+      // Close logging
+      await this.closeLogging(config);
+
       return {
         success: taskCompleted,
         output: `Task ${config.taskId} completed. Output saved to ${outputPath}`,
@@ -120,6 +175,20 @@ export class ClaudeProvider implements AIProvider {
       };
     } catch (error) {
       const duration = Date.now() - startTime;
+
+      // Log error
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        content: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      });
+
+      // Close logging on error
+      await this.closeLogging(config);
+
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -178,6 +247,102 @@ Begin task execution now.`;
     return path.join(outputDir, `${config.taskId}.md`);
   }
 
+  private initializeLogging(config: TaskConfig): string {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const logDir = path.join(carrierPath, 'deployed', config.deployedId, 'logs');
+
+    // Ensure log directory exists
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    // Create log files
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logFileName = `${config.taskId}_${timestamp}.json`;
+    const logPath = path.join(logDir, logFileName);
+
+    // Create a symlink to the latest log for easy access
+    const latestLogPath = path.join(logDir, `${config.taskId}_latest.json`);
+    if (fs.existsSync(latestLogPath)) {
+      fs.unlinkSync(latestLogPath);
+    }
+    fs.symlinkSync(logFileName, latestLogPath);
+
+    // Initialize log stream
+    this.logStream = createWriteStream(logPath, { flags: 'w' });
+    this.logEntries = [];
+
+    // Write log header
+    this.logStream.write('[\n');
+
+    return logPath;
+  }
+
+  private logEntry(entry: LogEntry): void {
+    if (!this.logStream) return;
+
+    // Add to memory buffer
+    this.logEntries.push(entry);
+
+    // Write to file stream
+    const isFirst = this.logEntries.length === 1;
+    const jsonEntry = JSON.stringify(entry, null, 2);
+    this.logStream.write((isFirst ? '' : ',\n') + jsonEntry);
+  }
+
+  private async closeLogging(config: TaskConfig): Promise<void> {
+    if (!this.logStream) return;
+
+    // Write closing bracket
+    this.logStream.write('\n]\n');
+
+    // Close the stream
+    await new Promise<void>((resolve) => {
+      if (this.logStream) {
+        this.logStream.end(() => resolve());
+      } else {
+        resolve();
+      }
+    });
+
+    this.logStream = null;
+
+    // Also save a summary log
+    await this.saveSummaryLog(config);
+  }
+
+  private async saveSummaryLog(config: TaskConfig): Promise<void> {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const logDir = path.join(carrierPath, 'deployed', config.deployedId, 'logs');
+    const summaryPath = path.join(logDir, `${config.taskId}_summary.md`);
+
+    // Extract key information from logs
+    const toolCalls = this.logEntries.filter(e => e.type === 'tool_call');
+    const errors = this.logEntries.filter(e => e.type === 'error');
+    const messages = this.logEntries.filter(e => e.type === 'message');
+
+    const summary = `# Task Execution Summary: ${config.taskId}
+
+## Overview
+- **Agent Type**: ${config.agentType}
+- **Deployment ID**: ${config.deployedId}
+- **Total Messages**: ${messages.length}
+- **Tool Calls**: ${toolCalls.length}
+- **Errors**: ${errors.length}
+
+## Tool Usage
+${toolCalls.map(tc => `- ${new Date(tc.timestamp).toLocaleTimeString()}: ${JSON.stringify(tc.content?.name || tc.content)}`).join('\n')}
+
+## Errors
+${errors.length > 0 ? errors.map(e => `- ${e.content?.error || e.content}`).join('\n') : 'No errors encountered'}
+
+---
+_Generated at ${new Date().toISOString()}_
+`;
+
+    fs.writeFileSync(summaryPath, summary);
+  }
+
   private async processMessage(
     message: SDKMessage,
     config: TaskConfig,
@@ -218,6 +383,17 @@ Begin task execution now.`;
                   // Show key parameters for common tools
                   this.displayToolParameters(block.name, block.input);
                 }
+
+                // Log tool call
+                this.logEntry({
+                  timestamp: new Date().toISOString(),
+                  type: 'tool_call',
+                  content: {
+                    name: block.name,
+                    input: block.input,
+                    id: block.id
+                  }
+                });
               }
             });
           }
@@ -241,6 +417,18 @@ Begin task execution now.`;
 
       case 'stream_event':
         if (message.event) {
+          // Log specific stream events
+          if (message.event.type === 'tool_use' ||
+              message.event.type === 'content_block_start' ||
+              message.event.type === 'thinking') {
+            this.logEntry({
+              timestamp: new Date().toISOString(),
+              type: 'message',
+              content: message.event,
+              metadata: { streamEvent: message.event.type }
+            });
+          }
+
           const eventUpdates = this.handleStreamEvent(message.event, config);
           if (eventUpdates.toolUseCount) {
             toolUseCount += eventUpdates.toolUseCount;
@@ -298,6 +486,17 @@ Begin task execution now.`;
         toolUseCount++;
         const toolName = event.content_block.name || 'unknown';
         console.log(`\n🛠️ Calling tool: ${toolName}`);
+
+        // Log tool call start
+        this.logEntry({
+          timestamp: new Date().toISOString(),
+          type: 'tool_call',
+          content: {
+            event: 'start',
+            name: toolName,
+            id: event.content_block.id
+          }
+        });
       } else if (event.content_block.type === 'text') {
         // Text generation starting
         process.stdout.write('💭 Thinking');
@@ -317,10 +516,30 @@ Begin task execution now.`;
       // Legacy tool use event
       toolUseCount++;
       console.log(`\n🔧 Tool: ${event.tool_use.name}`);
+
+      // Log tool result if available
+      if (event.tool_use.result) {
+        this.logEntry({
+          timestamp: new Date().toISOString(),
+          type: 'tool_result',
+          content: {
+            name: event.tool_use.name,
+            result: event.tool_use.result,
+            id: event.tool_use.id
+          }
+        });
+      }
     } else if (event.type === 'thinking' && event.thinking) {
       // Show thinking/reasoning if available
       const preview = event.thinking.substring(0, 100);
       console.log(`\n🤔 Reasoning: ${preview}${event.thinking.length > 100 ? '...' : ''}`);
+
+      // Log thinking
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'thinking',
+        content: event.thinking
+      });
     } else if (event.file_operation) {
       // File operations
       const op = event.file_operation;
@@ -333,8 +552,26 @@ Begin task execution now.`;
       };
       const opEmoji = emojiMap[op.type] || '📁';
       console.log(`${opEmoji} File ${op.type}: ${op.path || 'unknown'}`);
+
+      // Log file operation
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'tool_call',
+        content: {
+          name: `file_${op.type}`,
+          path: op.path,
+          operation: op
+        }
+      });
     } else if (event.error) {
       console.error(`\n❌ Error: ${event.error.message}`);
+
+      // Log error
+      this.logEntry({
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        content: event.error
+      });
     }
 
     return { toolUseCount };

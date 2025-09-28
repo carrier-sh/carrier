@@ -217,26 +217,49 @@ export class TaskExecutor {
     const path = await import('path');
 
     const carrierPath = this.core['carrierPath'];
+    const jsonLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}_latest.json`);
+    const summaryLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}_summary.md`);
     const sessionLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}-session.log`);
 
-    console.log(`\n👁️  Watching session logs for task ${taskId}`);
+    // Try JSON log first (new format)
+    if (fs.existsSync(jsonLogPath)) {
+      console.log(`\n👁️  Watching JSON logs for task ${taskId}`);
+      console.log(`📝 Log file: ${jsonLogPath}`);
+      if (fs.existsSync(summaryLogPath)) {
+        console.log(`📄 Summary: ${summaryLogPath}`);
+      }
+      console.log(`Press Ctrl+C to stop watching\n`);
+
+      // Watch the JSON log file
+      await this.tailJsonLog(jsonLogPath);
+      return;
+    }
+
+    console.log(`\n👁️  Watching logs for task ${taskId}`);
     console.log(`📝 Log file: ${sessionLogPath}`);
     console.log(`Press Ctrl+C to stop watching\n`);
 
     try {
       // Check if log file exists
       if (!fs.existsSync(sessionLogPath)) {
-        console.log(`⏳ Waiting for session log to be created...`);
+        console.log(`⏳ Waiting for log to be created...`);
 
         // Wait for file to be created (with timeout)
         let attempts = 0;
-        while (!fs.existsSync(sessionLogPath) && attempts < 30) {
+        while (!fs.existsSync(sessionLogPath) && !fs.existsSync(jsonLogPath) && attempts < 30) {
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempts++;
+
+          // Check again for JSON log
+          if (fs.existsSync(jsonLogPath)) {
+            console.log(`\n📝 Found JSON log: ${jsonLogPath}`);
+            await this.tailJsonLog(jsonLogPath);
+            return;
+          }
         }
 
-        if (!fs.existsSync(sessionLogPath)) {
-          console.log(`❌ Session log file not found: ${sessionLogPath}`);
+        if (!fs.existsSync(sessionLogPath) && !fs.existsSync(jsonLogPath)) {
+          console.log(`❌ Log file not found: ${sessionLogPath}`);
           return;
         }
       }
@@ -295,7 +318,8 @@ export class TaskExecutor {
     const carrierPath = this.core['carrierPath'];
     const logsDir = path.join(carrierPath, 'deployed', deployedId, 'logs');
 
-    console.log(`\n📋 Session Logs for Deployment ${deployedId}:`);
+    console.log(`\n📋 Logs for Deployment ${deployedId}:`);
+    console.log(`📂 Logs directory: ${logsDir}\n`);
 
     try {
       if (!fs.existsSync(logsDir)) {
@@ -306,25 +330,59 @@ export class TaskExecutor {
       const logFiles = fs.readdirSync(logsDir);
 
       if (logFiles.length === 0) {
-        console.log(`No session logs found in ${logsDir}`);
+        console.log(`No logs found in ${logsDir}`);
         return;
       }
 
-      for (const file of logFiles) {
-        const filePath = path.join(logsDir, file);
-        const stats = fs.statSync(filePath);
-        const size = Math.round(stats.size / 1024);
-        const modified = stats.mtime.toLocaleString();
+      // Categorize log files
+      const jsonLogs = logFiles.filter((f: string) => f.endsWith('.json') && !f.includes('_latest'));
+      const summaryLogs = logFiles.filter((f: string) => f.endsWith('_summary.md'));
+      const sessionLogs = logFiles.filter((f: string) => f.endsWith('-session.log'));
+      const latestLinks = logFiles.filter((f: string) => f.includes('_latest'));
 
-        console.log(`  📄 ${file}`);
-        console.log(`     Size: ${size}KB, Modified: ${modified}`);
-        console.log(`     Path: ${filePath}\n`);
+      if (jsonLogs.length > 0) {
+        console.log('📝 JSON Logs (detailed tool calls and messages):');
+        jsonLogs.forEach((file: string) => {
+          const taskId = file.split('_')[0];
+          const filePath = path.join(logsDir, file);
+          const stats = fs.statSync(filePath);
+          const size = Math.round(stats.size / 1024);
+          console.log(`  • ${taskId}: ${file} (${size}KB)`);
+        });
+        console.log('');
       }
 
-      console.log(`💡 Use "carrier watch-logs ${deployedId} <task-id>" to watch logs in real-time`);
+      if (summaryLogs.length > 0) {
+        console.log('📄 Summary Logs:');
+        summaryLogs.forEach((file: string) => {
+          const taskId = file.replace('_summary.md', '');
+          console.log(`  • ${taskId}: ${file}`);
+        });
+        console.log('');
+      }
+
+      if (sessionLogs.length > 0) {
+        console.log('📜 Session Logs:');
+        sessionLogs.forEach((file: string) => {
+          console.log(`  • ${file}`);
+        });
+        console.log('');
+      }
+
+      if (latestLinks.length > 0) {
+        console.log('🔗 Latest Log Links:');
+        latestLinks.forEach((file: string) => {
+          console.log(`  • ${file}`);
+        });
+        console.log('');
+      }
+
+      console.log('To view a specific log:');
+      console.log(`  carrier watch-logs ${deployedId} <task-id>`);
+      console.log(`  cat ${logsDir}/<log-file>`);
 
     } catch (error) {
-      console.error(`Error listing session logs: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`Error listing logs: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -369,5 +427,161 @@ export class TaskExecutor {
     // Background execution still uses provider system but with different output handling
     options.background = true;
     return this.executeTask(options);
+  }
+
+  /**
+   * Tail and pretty-print JSON logs
+   */
+  private async tailJsonLog(logPath: string): Promise<void> {
+    const fs = await import('fs');
+    const { spawn } = await import('child_process');
+
+    try {
+      // Read and parse the JSON log
+      const content = fs.readFileSync(logPath, 'utf-8');
+      let entries: Array<any> = [];
+
+      try {
+        entries = JSON.parse(content);
+      } catch (e) {
+        console.log('🔄 Log is being written, waiting for complete entries...');
+        // If JSON is incomplete, wait and retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const retryContent = fs.readFileSync(logPath, 'utf-8');
+          entries = JSON.parse(retryContent);
+        } catch (e2) {
+          entries = [];
+        }
+      }
+
+      console.log('📦 Log Entries:\n');
+
+      for (const entry of entries) {
+        this.displayLogEntry(entry);
+      }
+
+      // Now tail the file for new entries
+      console.log('\n🔄 Watching for new entries...\n');
+      const tail = spawn('tail', ['-f', logPath]);
+
+      let buffer = '';
+      tail.stdout.on('data', (data) => {
+        buffer += data.toString();
+        // Try to parse complete JSON entries
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim() && line !== '[' && line !== ']') {
+            try {
+              // Remove trailing comma if present
+              const cleanLine = line.replace(/,$/, '');
+              const entry = JSON.parse(cleanLine);
+              this.displayLogEntry(entry);
+            } catch (e) {
+              // Not a complete JSON entry yet
+            }
+          }
+        }
+      });
+
+      tail.stderr.on('data', (data) => {
+        console.error(`Error: ${data}`);
+      });
+
+      tail.on('close', (code) => {
+        console.log(`\nLog watching ended`);
+      });
+
+      // Handle Ctrl+C
+      process.on('SIGINT', () => {
+        tail.kill();
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(`Failed to read log: ${error}`);
+    }
+  }
+
+  /**
+   * Display a formatted log entry
+   */
+  private displayLogEntry(entry: any): void {
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    const typeEmoji = {
+      'message': '💬',
+      'tool_call': '🔧',
+      'tool_result': '✅',
+      'thinking': '🤔',
+      'error': '❌',
+      'system': '⚙️'
+    }[entry.type] || '📝';
+
+    console.log(`${time} ${typeEmoji} [${entry.type}]`);
+
+    if (entry.type === 'tool_call' && entry.content) {
+      console.log(`  Tool: ${entry.content.name}`);
+      if (entry.content.input) {
+        // Show key parameters
+        const params = Object.entries(entry.content.input)
+          .slice(0, 3)
+          .map(([k, v]: [string, any]) => {
+            const val = typeof v === 'string' ? v : JSON.stringify(v);
+            return `${k}: ${val.substring(0, 50)}${val.length > 50 ? '...' : ''}`;
+          })
+          .join(', ');
+        if (params) {
+          console.log(`  Params: ${params}`);
+        }
+      }
+    } else if (entry.type === 'message' && entry.content) {
+      if (entry.content.type === 'assistant' && entry.content.message) {
+        // Show preview of assistant message
+        const text = this.extractTextFromMessage(entry.content.message);
+        if (text) {
+          console.log(`  ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
+        }
+      } else if (entry.metadata?.streamEvent) {
+        console.log(`  Stream event: ${entry.metadata.streamEvent}`);
+      }
+    } else if (entry.type === 'thinking' && entry.content) {
+      const thinking = typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content);
+      console.log(`  ${thinking.substring(0, 100)}${thinking.length > 100 ? '...' : ''}`);
+    } else if (entry.type === 'error' && entry.content) {
+      console.log(`  Error: ${entry.content.error || entry.content}`);
+    } else if (entry.type === 'system' && entry.content) {
+      if (entry.content.event === 'task_complete') {
+        console.log(`  ✅ Task completed in ${entry.content.duration}s`);
+        console.log(`  Tokens: ${entry.content.totalTokens || 'N/A'}`);
+        console.log(`  Turns: ${entry.content.turnCount || 'N/A'}`);
+        console.log(`  Tool calls: ${entry.content.toolUseCount || 'N/A'}`);
+      } else if (entry.content.event === 'task_start') {
+        console.log(`  🚀 Starting task: ${entry.content.taskId}`);
+        console.log(`  Agent: ${entry.content.agentType}`);
+        console.log(`  Model: ${entry.content.model || 'default'}`);
+      }
+    }
+    console.log('');
+  }
+
+  /**
+   * Extract text content from a message
+   */
+  private extractTextFromMessage(message: any): string {
+    if (!message || !message.content) return '';
+
+    if (typeof message.content === 'string') {
+      return message.content;
+    }
+
+    if (Array.isArray(message.content)) {
+      return message.content
+        .filter((block: any) => block.type === 'text')
+        .map((block: any) => block.text || '')
+        .join('\n');
+    }
+
+    return '';
   }
 }
