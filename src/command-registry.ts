@@ -38,10 +38,11 @@ export const COMMANDS: Record<string, Command> = {
     name: 'deploy',
     aliases: ['d'],
     description: 'Deploy a fleet with a request',
-    usage: 'carrier deploy <fleet-id> "<request>"',
+    usage: 'carrier deploy <fleet-id> "<request>" [--background]',
     examples: [
       'carrier deploy code-change "Add dark mode to settings"',
-      'carrier deploy test-suite "Write tests for auth module"'
+      'carrier deploy test-suite "Write tests for auth module"',
+      'carrier deploy code-review "Review auth module" --background'
     ],
     category: 'core',
     requiresInit: true
@@ -154,52 +155,7 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: false
   },
 
-  // State management commands for fleet orchestration
-  'save-output': {
-    name: 'save-output',
-    description: 'Save task output for a deployment',
-    usage: 'carrier save-output <deployed-id> <task-id> --content "<content>"',
-    examples: [
-      'carrier save-output fleet-abc123 task1 --content "Task output here"'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'update-task': {
-    name: 'update-task',
-    description: 'Update task status in a deployment',
-    usage: 'carrier update-task <deployed-id> <task-id> --status <status>',
-    examples: [
-      'carrier update-task fleet-abc123 task1 --status complete',
-      'carrier update-task fleet-abc123 task2 --status failed'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'update-fleet': {
-    name: 'update-fleet',
-    description: 'Update fleet deployment status',
-    usage: 'carrier update-fleet <deployed-id> --status <status> [--current-task <task>]',
-    examples: [
-      'carrier update-fleet fleet-abc123 --status awaiting_approval',
-      'carrier update-fleet fleet-abc123 --status active --current-task task2'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'get-output': {
-    name: 'get-output',
-    description: 'Get task output from a deployment',
-    usage: 'carrier get-output <deployed-id> <task-id>',
-    examples: [
-      'carrier get-output fleet-abc123 task1'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
+  // Internal commands - not exposed to users
 
   fleet: {
     name: 'fleet',
@@ -214,51 +170,16 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: true
   },
 
-  'get-context': {
-    name: 'get-context',
-    description: 'Get deployment context for task execution',
-    usage: 'carrier get-context <deployed-id> <task-id>',
-    examples: [
-      'carrier get-context fleet-abc123 task1'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
 
   execute: {
     name: 'execute',
     aliases: ['exec', 'e'],
     description: 'Continue executing a deployment from its current task',
-    usage: 'carrier execute <deployed-id> [--timeout <seconds>] [--background]',
+    usage: 'carrier execute <deployed-id> [--background]',
     examples: [
       'carrier execute 1',
-      'carrier exec 2 --timeout 300',
+      'carrier exec 2',
       'carrier e 3 --background'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'execute-task': {
-    name: 'execute-task',
-    description: 'Execute a specific task - launches interactive Claude Code session (default) or runs in background',
-    usage: 'carrier execute-task <deployed-id> <task-id> --agent-type <type> --prompt "<prompt>" [--timeout <seconds>] [--background]',
-    examples: [
-      'carrier execute-task fleet-abc123 task1 --agent-type requirement-analyzer --prompt "Analyze requirements"',
-      'carrier execute-task fleet-abc123 task2 --agent-type code-executor --prompt "Execute tests" --timeout 300',
-      'carrier execute-task fleet-abc123 task3 --agent-type test-creator --prompt "Create test suite" --background'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'task-status': {
-    name: 'task-status',
-    description: 'Get the status of a running or completed task',
-    usage: 'carrier task-status <deployed-id> <task-id> [--json]',
-    examples: [
-      'carrier task-status fleet-abc123 task1',
-      'carrier task-status fleet-abc123 task2 --json'
     ],
     category: 'core',
     requiresInit: true

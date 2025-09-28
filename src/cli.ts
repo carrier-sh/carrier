@@ -131,22 +131,8 @@ async function handleCommand() {
       return await cli.config(allParams);
     case 'uninstall':
       return await cli.uninstall(allParams);
-    case 'save-output':
-      return await cli.saveOutput(allParams);
-    case 'update-task':
-      return await cli.updateTask(allParams);
-    case 'update-fleet':
-      return await cli.updateFleet(allParams);
-    case 'get-output':
-      return await cli.getOutput(allParams);
     case 'fleet':
       return await cli.fleet(allParams);
-    case 'get-context':
-      return await cli.getContext(allParams);
-    case 'execute-task':
-      return await cli.executeTask(allParams);
-    case 'task-status':
-      return await cli.taskStatus(allParams);
     case 'clean':
     case 'cleanup':
       return await cli.clean(allParams);

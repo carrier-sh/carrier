@@ -1,4 +1,18 @@
-export async function executeTask(this: any, params: string[]): Promise<void> {
+import { spawn } from 'child_process';
+import { CarrierCore } from '../core.js';
+
+// Helper function to build Claude command
+function buildClaudeCommand(agentType: string, prompt: string, taskId: string, deployedId: string): string[] {
+  const command = [
+    '/Task',
+    `subagent_type=${agentType}`,
+    `description="Task ${taskId} for deployment ${deployedId}"`,
+    `prompt="${prompt}"`
+  ];
+  return command;
+}
+
+export async function executeTask(carrier: CarrierCore, params: string[]): Promise<void> {
   const deployedId = params[0];
   const taskId = params[1];
   const agentTypeIndex = params.findIndex(p => p === '--agent-type');
@@ -19,10 +33,10 @@ export async function executeTask(this: any, params: string[]): Promise<void> {
 
   try {
     // Update task status to active
-    await this.carrier.updateTaskStatus(deployedId, taskId, 'active');
+    await carrier.updateTaskStatus(deployedId, taskId, 'active');
     
     // Build the Claude CLI command
-    const claudeCommand = this.buildClaudeCommand(agentType, prompt, taskId, deployedId);
+    const claudeCommand = buildClaudeCommand(agentType, prompt, taskId, deployedId);
     
     console.log(`Launching task ${taskId} with agent type: ${agentType}`);
     
@@ -38,7 +52,7 @@ export async function executeTask(this: any, params: string[]): Promise<void> {
       });
       
       // Store process info in metadata
-      await this.carrier.updateTaskProcessInfo(deployedId, taskId, child.pid || 0);
+      await carrier.updateTaskProcessInfo(deployedId, taskId, child.pid || 0);
       
       // Unref to allow parent to exit
       child.unref();
@@ -54,7 +68,7 @@ export async function executeTask(this: any, params: string[]): Promise<void> {
       });
       
       // Store process info
-      await this.carrier.updateTaskProcessInfo(deployedId, taskId, child.pid || 0);
+      await carrier.updateTaskProcessInfo(deployedId, taskId, child.pid || 0);
       
       // Wait for process to complete
       const exitCode = await new Promise<number>((resolve) => {
@@ -70,15 +84,15 @@ export async function executeTask(this: any, params: string[]): Promise<void> {
       
       // Update task status based on exit code
       if (exitCode === 0) {
-        await this.carrier.updateTaskStatus(deployedId, taskId, 'complete');
+        await carrier.updateTaskStatus(deployedId, taskId, 'complete');
         console.log(`\\nTask ${taskId} completed successfully`);
       } else {
-        await this.carrier.updateTaskStatus(deployedId, taskId, 'failed');
+        await carrier.updateTaskStatus(deployedId, taskId, 'failed');
         console.error(`\\nTask ${taskId} failed with exit code ${exitCode}`);
       }
     }
   } catch (error: any) {
     console.error(`Error executing task: ${error.message}`);
-    await this.carrier.updateTaskStatus(deployedId, taskId, 'failed');
+    await carrier.updateTaskStatus(deployedId, taskId, 'failed');
   }
 }
