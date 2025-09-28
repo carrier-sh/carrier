@@ -2,13 +2,20 @@ import { spawn } from 'child_process';
 import { CarrierCore } from '../core.js';
 
 function buildClaudeCommand(agentType: string, prompt: string, taskId: string, deployedId: string): string[] {
-  const command = [
-    '/Task',
-    `subagent_type=${agentType}`,
-    `description="Task ${taskId} for deployment ${deployedId}"`,
-    `prompt="${prompt}"`
-  ];
-  return command;
+  // Create a comprehensive prompt that Claude can execute directly
+  const fullPrompt = `[Carrier Task Execution]
+Deployment ID: ${deployedId}
+Task ID: ${taskId}
+Agent Type: ${agentType}
+
+Please use the Task tool with the following parameters:
+- subagent_type: ${agentType}
+- description: "Task ${taskId} for deployment ${deployedId}"
+- prompt: "${prompt}"
+
+Execute this task now and provide the results.`;
+
+  return [fullPrompt];
 }
 
 export async function executeTask(carrier: CarrierCore, params: string[]): Promise<void> {

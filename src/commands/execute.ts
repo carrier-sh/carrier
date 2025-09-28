@@ -2,13 +2,20 @@ import { spawn } from 'child_process';
 import { CarrierCore } from '../core.js';
 
 function buildClaudeCommand(agentType: string, prompt: string, taskId: string, deployedId: string): string[] {
-  const command = [
-    '/Task',
-    `subagent_type=${agentType}`,
-    `description="Task ${taskId} for deployment ${deployedId}"`,
-    `prompt="${prompt}"`
-  ];
-  return command;
+  // Create a comprehensive prompt that Claude can execute directly
+  const fullPrompt = `[Carrier Task Execution]
+Deployment ID: ${deployedId}
+Task ID: ${taskId}
+Agent Type: ${agentType}
+
+Please use the Task tool with the following parameters:
+- subagent_type: ${agentType}
+- description: "Task ${taskId} for deployment ${deployedId}"
+- prompt: "${prompt}"
+
+Execute this task now and provide the results.`;
+
+  return [fullPrompt];
 }
 
 export async function execute(
@@ -112,7 +119,27 @@ export async function execute(
       if (exitCode === 0) {
         await carrier.updateTaskStatus(deployedId, currentTaskId, 'complete');
         console.log(`\nTask ${currentTaskId} completed successfully`);
-        console.log(`Use "carrier status ${deployedId}" to check fleet status`);
+
+        // Check for automatic task transition
+        const fleet = carrier.loadFleet(deployed.fleetId);
+        const currentTask = fleet.tasks.find(t => t.id === currentTaskId);
+        const nextTaskRef = currentTask?.nextTasks?.find(nt => nt.condition === 'success');
+
+        if (nextTaskRef && nextTaskRef.taskId !== 'complete') {
+          // Transition to next task
+          const nextTask = fleet.tasks.find(t => t.id === nextTaskRef.taskId);
+          if (nextTask) {
+            console.log(`\nAutomatically transitioning to next task: ${nextTask.id}`);
+            await carrier.updateDeployedStatus(deployedId, 'active', nextTask.id, nextTask.agent);
+            console.log(`Use "carrier execute ${deployedId}" to continue with ${nextTask.id}`);
+          }
+        } else if (nextTaskRef?.taskId === 'complete') {
+          // Fleet completed
+          await carrier.updateDeployedStatus(deployedId, 'complete');
+          console.log(`\nFleet ${deployedId} completed successfully!`);
+        } else {
+          console.log(`Use "carrier status ${deployedId}" to check fleet status`);
+        }
       } else {
         await carrier.updateTaskStatus(deployedId, currentTaskId, 'failed');
         console.error(`\nTask ${currentTaskId} failed with exit code ${exitCode}`);
