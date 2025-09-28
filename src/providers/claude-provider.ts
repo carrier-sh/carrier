@@ -6,101 +6,48 @@
 import { spawn, ChildProcess } from 'child_process';
 import { writeFileSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { AIProvider, TaskConfig, TaskResult, ProviderConfig } from './provider-interface.js';
+import {
+  AIProvider,
+  TaskConfig,
+  TaskResult,
+  ProviderConfig,
+  ClaudeProviderOptions,
+  PermissionMode,
+  HookEvent,
+  SDKMessage,
+  Query,
+  CallToolResult,
+  SdkMcpTool,
+  McpSdkServerConfigWithInstance,
+  HookCallbackMatcher,
+  SDKOptions,
+  QueryParams,
+  StreamEvent,
+  TokenUsage
+} from '../types/providers.js';
 import { CarrierCore } from '../core.js';
-
-// Type definitions for Claude SDK (based on actual SDK documentation)
-export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
-
-export type HookEvent =
-  | 'PreToolUse'
-  | 'PostToolUse'
-  | 'Notification'
-  | 'UserPromptSubmit'
-  | 'SessionStart'
-  | 'SessionEnd'
-  | 'Stop'
-  | 'SubagentStop'
-  | 'PreCompact';
-
-export interface SDKMessage {
-  type: 'assistant' | 'user' | 'result' | 'system' | 'stream_event';
-  uuid?: string;
-  session_id?: string;
-  content?: string;
-  message?: any;
-  subtype?: string;
-  tools?: string[];
-  model?: string;
-  permissionMode?: PermissionMode;
-  duration_ms?: number;
-  total_cost_usd?: number;
-  usage?: any;
-  parent_tool_use_id?: string | null;
-  event?: any;
-}
-
-export interface Query extends AsyncGenerator<SDKMessage, void, unknown> {
-  interrupt(): Promise<void>;
-  setPermissionMode(mode: PermissionMode): Promise<void>;
-}
-
-export interface CallToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-}
-
-export interface SdkMcpTool {
-  name: string;
-  description: string;
-  inputSchema: any;
-  handler: (args: any) => Promise<CallToolResult>;
-}
-
-export interface McpSdkServerConfigWithInstance {
-  type: 'sdk';
-  name: string;
-  instance: {
-    tools: SdkMcpTool[];
-  };
-}
-
-export interface HookCallbackMatcher {
-  matcher?: string;
-  hooks: Array<(input: any, toolUseID: string | undefined, options: { signal: AbortSignal }) => Promise<any>>;
-}
-
-export interface Options {
-  cwd?: string;
-  model?: string;
-  permissionMode?: PermissionMode;
-  mcpServers?: Record<string, any>;
-  maxTurns?: number;
-  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
-  includePartialMessages?: boolean;
-  maxThinkingTokens?: number;
-}
 
 // Create chainable mock schema object
 const createSchemaChain = () => ({
   describe: (desc: string) => createSchemaChain(),
   optional: () => createSchemaChain(),
-  default: (val: any) => createSchemaChain()
+  default: (val: unknown) => createSchemaChain()
 });
 
 const z = {
   string: () => createSchemaChain(),
   boolean: () => createSchemaChain(),
-  record: (type: any) => createSchemaChain(),
-  object: (shape: any) => ({}),
-  infer: (schema: any) => ({} as any)
+  record: (type: unknown) => createSchemaChain(),
+  object: (shape: unknown) => ({}),
+  infer: (schema: unknown) => ({} as unknown)
 };
 
 // Mock SDK functions (to be replaced with real SDK when available)
-export function tool<T extends Record<string, any>>(
+export function tool<T extends Record<string, unknown>>(
   name: string,
   description: string,
   inputSchema: T,
-  handler: (args: any) => Promise<CallToolResult>
+  handler: (args: unknown) => Promise<CallToolResult>
 ): SdkMcpTool {
   return { name, description, inputSchema, handler };
 }
@@ -119,11 +66,8 @@ export function createSdkMcpServer(options: {
   };
 }
 
-export function query(options: {
-  prompt: string;
-  options?: Options;
-}): Query {
-  const generator = createQueryGenerator(options);
+export function query(params: QueryParams): Query {
+  const generator = createQueryGenerator(params);
 
   // Create an object that implements Query interface
   const queryObject: Query = {
@@ -137,10 +81,10 @@ export function query(options: {
     async next() {
       return generator.next();
     },
-    async return(value?: any) {
+    async return(value?: unknown) {
       return generator.return(value);
     },
-    async throw(e?: any) {
+    async throw(e?: unknown) {
       return generator.throw(e);
     },
     [Symbol.asyncIterator]() {
@@ -151,12 +95,9 @@ export function query(options: {
   return queryObject;
 }
 
-async function* createQueryGenerator(options: {
-  prompt: string;
-  options?: Options;
-}): AsyncGenerator<SDKMessage> {
+async function* createQueryGenerator(params: QueryParams): AsyncGenerator<SDKMessage> {
   // Mock implementation that calls the actual Claude CLI for now
-  const claudeProcess = spawn('claude', [options.prompt], {
+  const claudeProcess = spawn('claude', [params.prompt], {
     stdio: ['inherit', 'pipe', 'pipe']
   });
 
@@ -182,14 +123,6 @@ async function* createQueryGenerator(options: {
 
   yield { type: 'assistant', content: output };
   yield { type: 'result', content: 'Task completed' };
-}
-
-export interface ClaudeProviderOptions {
-  carrierPath?: string;
-  isGlobal?: boolean;
-  permissionMode?: PermissionMode;
-  model?: string;
-  cwd?: string;
 }
 
 export class ClaudeProvider implements AIProvider {
@@ -504,7 +437,9 @@ Execute this task now and provide the results.`;
       'deployFleet',
       'Deploy a Carrier fleet with a user request',
       schema,
-      async (args): Promise<CallToolResult> => {
+      async (args: unknown): Promise<CallToolResult> => {
+        const typedArgs = args as { fleetId: string; request: string };
+
         if (!this.core) {
           return {
             content: [{ type: 'text', text: '❌ Core not available' }]
@@ -512,12 +447,12 @@ Execute this task now and provide the results.`;
         }
 
         try {
-          const result = await this.core.createDeployed(args.fleetId, args.request);
+          const result = await this.core.createDeployed(typedArgs.fleetId, typedArgs.request);
           if (result.success && result.data) {
             return {
               content: [{
                 type: 'text',
-                text: `✅ Fleet deployed successfully!\n\n**Deployment ID:** ${result.data.id}\n**Fleet:** ${args.fleetId}\n**Status:** ${result.data.status}\n**Current Task:** ${result.data.currentTask}`
+                text: `✅ Fleet deployed successfully!\n\n**Deployment ID:** ${result.data.id}\n**Fleet:** ${typedArgs.fleetId}\n**Status:** ${result.data.status}\n**Current Task:** ${result.data.currentTask}`
               }]
             };
           } else {
@@ -544,7 +479,9 @@ Execute this task now and provide the results.`;
       'executeTask',
       'Execute a task within a deployed fleet',
       schema,
-      async (args): Promise<CallToolResult> => {
+      async (args: unknown): Promise<CallToolResult> => {
+        const typedArgs = args as { deployedId: string; taskId?: string };
+
         if (!this.core) {
           return {
             content: [{ type: 'text', text: '❌ Core not available' }]
@@ -552,17 +489,17 @@ Execute this task now and provide the results.`;
         }
 
         try {
-          const deployed = this.core.getDeployedFleet(args.deployedId);
+          const deployed = this.core.getDeployedFleet(typedArgs.deployedId);
           if (!deployed) {
             return {
-              content: [{ type: 'text', text: `❌ Deployment ${args.deployedId} not found` }]
+              content: [{ type: 'text', text: `❌ Deployment ${typedArgs.deployedId} not found` }]
             };
           }
 
           return {
             content: [{
               type: 'text',
-              text: `🔄 Task execution initiated for deployment ${args.deployedId}`
+              text: `🔄 Task execution initiated for deployment ${typedArgs.deployedId}`
             }]
           };
         } catch (error) {
@@ -583,7 +520,9 @@ Execute this task now and provide the results.`;
       'approveTask',
       'Approve a task that is awaiting approval',
       schema,
-      async (args): Promise<CallToolResult> => {
+      async (args: unknown): Promise<CallToolResult> => {
+        const typedArgs = args as { deployedId: string };
+
         if (!this.core) {
           return {
             content: [{ type: 'text', text: '❌ Core not available' }]
@@ -591,7 +530,7 @@ Execute this task now and provide the results.`;
         }
 
         try {
-          const result = await this.core.approveTask(args.deployedId);
+          const result = await this.core.approveTask(typedArgs.deployedId);
           return {
             content: [{
               type: 'text',
@@ -616,7 +555,9 @@ Execute this task now and provide the results.`;
       'getStatus',
       'Get the status of deployments',
       schema,
-      async (args): Promise<CallToolResult> => {
+      async (args: unknown): Promise<CallToolResult> => {
+        const typedArgs = args as { deployedId?: string };
+
         if (!this.core) {
           return {
             content: [{ type: 'text', text: '❌ Core not available' }]
@@ -624,9 +565,9 @@ Execute this task now and provide the results.`;
         }
 
         try {
-          const result = await this.core.getStatus(args.deployedId);
+          const result = await this.core.getStatus(typedArgs.deployedId);
           if (result.success) {
-            const statusText = this.formatStatusOutput(result.data, args.deployedId);
+            const statusText = this.formatStatusOutput(result.data, typedArgs.deployedId);
             return {
               content: [{ type: 'text', text: statusText }]
             };
@@ -651,7 +592,7 @@ Execute this task now and provide the results.`;
       'listFleets',
       'List all available fleets',
       schema,
-      async (): Promise<CallToolResult> => {
+      async (args: unknown): Promise<CallToolResult> => {
         if (!this.core) {
           return {
             content: [{ type: 'text', text: '❌ Core not available' }]
@@ -687,28 +628,39 @@ Execute this task now and provide the results.`;
     );
   }
 
-  private formatStatusOutput(data: any, deployedId?: string): string {
+  private formatStatusOutput(data: unknown, deployedId?: string): string {
     if (deployedId) {
-      let text = `📊 **Deployment Status: ${data.id}**\n\n`;
-      text += `**Fleet:** ${data.fleetId}\n`;
-      text += `**Status:** ${data.status}\n`;
-      text += `**Current Task:** ${data.currentTask}\n`;
-      text += `**Deployed:** ${new Date(data.deployedAt).toLocaleString()}\n\n`;
+      const deployment = data as {
+        id: string;
+        fleetId: string;
+        status: string;
+        currentTask: string;
+        deployedAt: string;
+        tasks: Array<{ id: string; status: string }>;
+      };
+
+      let text = `📊 **Deployment Status: ${deployment.id}**\n\n`;
+      text += `**Fleet:** ${deployment.fleetId}\n`;
+      text += `**Status:** ${deployment.status}\n`;
+      text += `**Current Task:** ${deployment.currentTask}\n`;
+      text += `**Deployed:** ${new Date(deployment.deployedAt).toLocaleString()}\n\n`;
 
       text += `**Tasks:**\n`;
-      for (const task of data.tasks) {
+      for (const task of deployment.tasks) {
         const icon = task.status === 'completed' ? '✅' : task.status === 'active' ? '⏳' : '⭕';
         text += `${icon} ${task.id} - ${task.status}\n`;
       }
 
       return text;
     } else {
-      if (!Array.isArray(data) || data.length === 0) {
+      const deployments = data as Array<{ id: string; fleetId: string; status: string }>;
+
+      if (!Array.isArray(deployments) || deployments.length === 0) {
         return '📊 No active deployments found.';
       }
 
       let text = '📊 **All Deployments:**\n\n';
-      for (const deployment of data) {
+      for (const deployment of deployments) {
         text += `• **${deployment.id}** (${deployment.fleetId}) - ${deployment.status}\n`;
       }
 
@@ -827,22 +779,24 @@ ${sessionLog}
   private buildComprehensiveHooks(config: TaskConfig, sessionLogPath: string): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
     return {
       PreToolUse: [{
-        hooks: [async (input: any, toolUseID: string | undefined) => {
-          const logEntry = `🔧 TOOL PRE-USE: ${input.tool_name}\n   Input: ${JSON.stringify(input.tool_input, null, 2)}\n   Tool ID: ${toolUseID}\n`;
-          console.log(`🔧 About to use tool: ${input.tool_name}`);
-          console.log(`   Parameters: ${JSON.stringify(input.tool_input, null, 2)}`);
+        hooks: [async (input: unknown, toolUseID: string | undefined) => {
+          const toolInput = input as { tool_name?: string; tool_input?: unknown };
+          const logEntry = `🔧 TOOL PRE-USE: ${toolInput.tool_name}\n   Input: ${JSON.stringify(toolInput.tool_input, null, 2)}\n   Tool ID: ${toolUseID}\n`;
+          console.log(`🔧 About to use tool: ${toolInput.tool_name}`);
+          console.log(`   Parameters: ${JSON.stringify(toolInput.tool_input, null, 2)}`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       PostToolUse: [{
-        hooks: [async (input: any, toolUseID: string | undefined) => {
-          const logEntry = `✅ TOOL POST-USE: ${input.tool_name}\n   Response: ${JSON.stringify(input.tool_response, null, 2)}\n   Tool ID: ${toolUseID}\n   Duration: ${input.duration_ms || 'unknown'}ms\n`;
-          console.log(`✅ Tool completed: ${input.tool_name}`);
-          console.log(`   Response: ${JSON.stringify(input.tool_response, null, 2)}`);
-          if (input.duration_ms) {
-            console.log(`   Duration: ${input.duration_ms}ms`);
+        hooks: [async (input: unknown, toolUseID: string | undefined) => {
+          const toolOutput = input as { tool_name?: string; tool_response?: unknown; duration_ms?: number };
+          const logEntry = `✅ TOOL POST-USE: ${toolOutput.tool_name}\n   Response: ${JSON.stringify(toolOutput.tool_response, null, 2)}\n   Tool ID: ${toolUseID}\n   Duration: ${toolOutput.duration_ms || 'unknown'}ms\n`;
+          console.log(`✅ Tool completed: ${toolOutput.tool_name}`);
+          console.log(`   Response: ${JSON.stringify(toolOutput.tool_response, null, 2)}`);
+          if (toolOutput.duration_ms) {
+            console.log(`   Duration: ${toolOutput.duration_ms}ms`);
           }
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
@@ -850,26 +804,28 @@ ${sessionLog}
       }],
 
       SessionStart: [{
-        hooks: [async (input: any) => {
-          const logEntry = `🚀 SESSION START: ${input.source || 'manual'}\n   Session ID: ${input.session_id}\n   CWD: ${input.cwd}\n   Permission Mode: ${input.permission_mode}\n   Model: ${input.model}\n   Available Tools: ${input.tools ? input.tools.length : 0}\n`;
+        hooks: [async (input: unknown) => {
+          const sessionStart = input as { source?: string; session_id?: string; cwd?: string; permission_mode?: string; model?: string; tools?: string[] };
+          const logEntry = `🚀 SESSION START: ${sessionStart.source || 'manual'}\n   Session ID: ${sessionStart.session_id}\n   CWD: ${sessionStart.cwd}\n   Permission Mode: ${sessionStart.permission_mode}\n   Model: ${sessionStart.model}\n   Available Tools: ${sessionStart.tools ? sessionStart.tools.length : 0}\n`;
           console.log(`🚀 Session starting...`);
-          console.log(`   Session ID: ${input.session_id}`);
-          console.log(`   Model: ${input.model}`);
-          console.log(`   Available Tools: ${input.tools ? input.tools.length : 0}`);
+          console.log(`   Session ID: ${sessionStart.session_id}`);
+          console.log(`   Model: ${sessionStart.model}`);
+          console.log(`   Available Tools: ${sessionStart.tools ? sessionStart.tools.length : 0}`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       SessionEnd: [{
-        hooks: [async (input: any) => {
-          const logEntry = `🏁 SESSION END: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n   Duration: ${input.duration_ms || 'unknown'}ms\n   Total Cost: $${input.total_cost_usd || 0}\n`;
-          console.log(`🏁 Session ended: ${input.reason || 'completed'}`);
-          if (input.duration_ms) {
-            console.log(`   Duration: ${input.duration_ms}ms`);
+        hooks: [async (input: unknown) => {
+          const sessionEnd = input as { reason?: string; session_id?: string; duration_ms?: number; total_cost_usd?: number };
+          const logEntry = `🏁 SESSION END: ${sessionEnd.reason || 'completed'}\n   Session ID: ${sessionEnd.session_id}\n   Duration: ${sessionEnd.duration_ms || 'unknown'}ms\n   Total Cost: $${sessionEnd.total_cost_usd || 0}\n`;
+          console.log(`🏁 Session ended: ${sessionEnd.reason || 'completed'}`);
+          if (sessionEnd.duration_ms) {
+            console.log(`   Duration: ${sessionEnd.duration_ms}ms`);
           }
-          if (input.total_cost_usd) {
-            console.log(`   Total Cost: $${input.total_cost_usd}`);
+          if (sessionEnd.total_cost_usd) {
+            console.log(`   Total Cost: $${sessionEnd.total_cost_usd}`);
           }
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
@@ -877,45 +833,50 @@ ${sessionLog}
       }],
 
       UserPromptSubmit: [{
-        hooks: [async (input: any) => {
-          const logEntry = `👤 USER PROMPT: ${input.prompt}\n   Prompt Length: ${input.prompt ? input.prompt.length : 0} chars\n`;
-          console.log(`👤 User prompt received (${input.prompt ? input.prompt.length : 0} chars)`);
+        hooks: [async (input: unknown) => {
+          const userPrompt = input as { prompt?: string };
+          const logEntry = `👤 USER PROMPT: ${userPrompt.prompt}\n   Prompt Length: ${userPrompt.prompt ? userPrompt.prompt.length : 0} chars\n`;
+          console.log(`👤 User prompt received (${userPrompt.prompt ? userPrompt.prompt.length : 0} chars)`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       Notification: [{
-        hooks: [async (input: any) => {
-          const logEntry = `📬 NOTIFICATION: ${input.message}\n   Title: ${input.title || 'No title'}\n   Type: ${input.type || 'unknown'}\n`;
-          console.log(`📬 ${input.title || 'Notification'}: ${input.message}`);
+        hooks: [async (input: unknown) => {
+          const notification = input as { message?: string; title?: string; type?: string };
+          const logEntry = `📬 NOTIFICATION: ${notification.message}\n   Title: ${notification.title || 'No title'}\n   Type: ${notification.type || 'unknown'}\n`;
+          console.log(`📬 ${notification.title || 'Notification'}: ${notification.message}`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       Stop: [{
-        hooks: [async (input: any) => {
-          const logEntry = `⛔ STOP: ${input.reason || 'manual stop'}\n   Session ID: ${input.session_id}\n`;
-          console.log(`⛔ Session stopped: ${input.reason || 'manual stop'}`);
+        hooks: [async (input: unknown) => {
+          const stop = input as { reason?: string; session_id?: string };
+          const logEntry = `⛔ STOP: ${stop.reason || 'manual stop'}\n   Session ID: ${stop.session_id}\n`;
+          console.log(`⛔ Session stopped: ${stop.reason || 'manual stop'}`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       SubagentStop: [{
-        hooks: [async (input: any) => {
-          const logEntry = `🔌 SUBAGENT STOP: ${input.subagent_type || 'unknown'}\n   Reason: ${input.reason || 'completed'}\n   Session ID: ${input.session_id}\n`;
-          console.log(`🔌 Subagent stopped: ${input.subagent_type || 'unknown'} (${input.reason || 'completed'})`);
+        hooks: [async (input: unknown) => {
+          const subagentStop = input as { subagent_type?: string; reason?: string; session_id?: string };
+          const logEntry = `🔌 SUBAGENT STOP: ${subagentStop.subagent_type || 'unknown'}\n   Reason: ${subagentStop.reason || 'completed'}\n   Session ID: ${subagentStop.session_id}\n`;
+          console.log(`🔌 Subagent stopped: ${subagentStop.subagent_type || 'unknown'} (${subagentStop.reason || 'completed'})`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
       }],
 
       PreCompact: [{
-        hooks: [async (input: any) => {
-          const logEntry = `🗜️ PRE-COMPACT: Starting context compaction\n   Messages before: ${input.messages_before || 'unknown'}\n   Session ID: ${input.session_id}\n`;
-          console.log(`🗜️ Compacting context: ${input.messages_before || 'unknown'} messages`);
+        hooks: [async (input: unknown) => {
+          const preCompact = input as { messages_before?: number; session_id?: string };
+          const logEntry = `🗜️ PRE-COMPACT: Starting context compaction\n   Messages before: ${preCompact.messages_before || 'unknown'}\n   Session ID: ${preCompact.session_id}\n`;
+          console.log(`🗜️ Compacting context: ${preCompact.messages_before || 'unknown'} messages`);
           this.appendToSessionLog(sessionLogPath, `[${new Date().toISOString()}] ${logEntry}\n`);
           return { continue: true };
         }]
@@ -1074,7 +1035,7 @@ ${sessionLog}
    */
   private handleStreamEvent(message: SDKMessage): void {
     if (message.event) {
-      const event = message.event;
+      const event: StreamEvent = message.event;
       const eventType = event.type || 'unknown';
 
       // Handle specific streaming event types with detailed visibility

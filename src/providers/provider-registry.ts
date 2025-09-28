@@ -2,7 +2,7 @@
  * Provider registry for managing AI providers
  */
 
-import { AIProvider, ProviderRegistry } from './provider-interface.js';
+import { AIProvider, ProviderRegistry } from '../types/providers.js';
 
 export class ProviderRegistryManager implements ProviderRegistry {
   providers = new Map<string, AIProvider>();

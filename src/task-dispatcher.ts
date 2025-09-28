@@ -4,8 +4,8 @@
  */
 
 import { ProviderRegistryManager } from './providers/provider-registry.js';
-import { ClaudeProvider, ClaudeProviderOptions } from './providers/claude-provider.js';
-import { TaskConfig, TaskResult, AIProvider } from './types/index.js';
+import { ClaudeProvider } from './providers/claude-provider.js';
+import { TaskConfig, TaskResult, AIProvider, ClaudeProviderOptions } from './types/index.js';
 
 export interface TaskDispatcherOptions {
   carrierPath?: string;

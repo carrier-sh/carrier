@@ -26,7 +26,22 @@ export type {
   TaskResult,
   ProviderConfig,
   AIProvider,
-  ProviderRegistry
+  ProviderRegistry,
+  ProviderOptions,
+  TokenUsage,
+  PermissionMode,
+  HookEvent,
+  MessageType,
+  SDKMessage,
+  StreamEvent,
+  Query,
+  CallToolResult,
+  SdkMcpTool,
+  McpSdkServerConfigWithInstance,
+  HookCallbackMatcher,
+  SDKOptions,
+  QueryParams,
+  ClaudeProviderOptions,
 } from './providers.js';
 
 // Configuration types
