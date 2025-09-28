@@ -174,11 +174,12 @@ export class CarrierCore {
 
   updateDeployedStatus(deployedId: string, status: FleetStatus, currentTask?: string, currentAgent?: string): void {
     const registry = this.loadRegistry();
-    const deployed = this.getDeployedFleet(deployedId);
-    if (!deployed) {
+    const deployedIndex = registry.deployedFleets.findIndex(f => f.id === deployedId || f.uniqueId === deployedId);
+    if (deployedIndex === -1) {
       throw new Error(`Deployed fleet ${deployedId} not found`);
     }
 
+    const deployed = registry.deployedFleets[deployedIndex];
     deployed.status = status;
     if (currentTask) {
       // When updating to a new current task, mark previous tasks as complete

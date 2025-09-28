@@ -117,9 +117,26 @@ export class TaskExecutor {
         // Transition to next task
         const nextTask = fleet.tasks.find(t => t.id === nextTaskRef.taskId);
         if (nextTask) {
-          console.log(`\n➡️  Automatically transitioning to next task: ${nextTask.id}`);
+          console.log(`\n➡️  Transitioning to next task: ${nextTask.id}`);
           await this.core.updateDeployedStatus(options.deployedId, 'active', nextTask.id, nextTask.agent);
-          console.log(`Use "carrier execute ${options.deployedId}" to continue with ${nextTask.id}`);
+
+          // Actually execute the next task
+          console.log(`\n🚀 Starting next task: ${nextTask.id} with agent: ${nextTask.agent}`);
+          const nextTaskResult = await this.executeTask({
+            deployedId: options.deployedId,
+            taskId: nextTask.id,
+            agentType: nextTask.agent,
+            prompt: options.prompt, // Reuse the original prompt
+            background: options.background,
+            interactive: options.interactive,
+            provider: options.provider,
+            timeout: options.timeout,
+            model: options.model
+          });
+
+          if (!nextTaskResult.success) {
+            console.error(`\n❌ Next task ${nextTask.id} execution failed: ${nextTaskResult.message}`);
+          }
         }
       } else if (nextTaskRef?.taskId === 'complete') {
         // Fleet completed
