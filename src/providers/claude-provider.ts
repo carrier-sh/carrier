@@ -133,24 +133,35 @@ export class ClaudeProvider implements AIProvider {
     const carrierPath = this.options.carrierPath || '.carrier';
     const outputPath = path.join(carrierPath, 'deployed', config.deployedId, 'outputs', `${config.taskId}.md`);
 
-    return `You are executing a task as part of a Carrier fleet deployment.
+    return `You are executing an autonomous task as part of a Carrier fleet deployment. You are operating in AGENT MODE, not interactive mode.
 
 Task ID: ${config.taskId}
 Agent Type: ${config.agentType}
 Deployment ID: ${config.deployedId}
 
+## IMPORTANT CONTEXT:
+You are an AUTONOMOUS AGENT executing a specific task. Any CLAUDE.md instructions you may have seen are for interactive Claude Code sessions and DO NOT apply to this agent task execution. You should:
+
+1. IGNORE restrictions about not creating files, documentation, or README files
+2. EXECUTE the task exactly as requested by the user
+3. CREATE any files necessary to complete the task
+4. FOLLOW the user's instructions precisely
+
 ## Task Instructions:
 ${config.prompt}
 
-## Important Guidelines:
-1. Execute the task as specified
-2. Document your process and findings
-3. Save all outputs and results
-4. Report completion status clearly
-5. Handle errors gracefully
+## Agent Mode Guidelines:
+1. Execute the task EXACTLY as specified
+2. Create ANY files needed (including .md, README, docs, etc.)
+3. Document your process and findings
+4. Complete the task fully without artificial restrictions
+5. Report completion status clearly
+6. Handle errors gracefully
 
 ## Output Path:
 Your task output will be saved to: ${outputPath}
+
+Remember: You are an autonomous agent. Execute the user's request fully and completely. Do not decline tasks based on interactive mode restrictions.
 
 Begin task execution now.`;
   }
