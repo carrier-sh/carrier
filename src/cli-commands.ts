@@ -9,6 +9,7 @@ import { CarrierCore } from './core.js';
 import { AuthManager } from './auth.js';
 import { RemoteFleetManager } from './remote-fleet-manager.js';
 import { ConfigManager } from './config-manager.js';
+import { TaskExecutor } from './task-executor.js';
 import { generateHelp } from './command-registry.js';
 import { Fleet } from './types/index.js';
 
@@ -30,6 +31,7 @@ export class CLICommands {
   private authManager: AuthManager;
   private remoteFleetManager: RemoteFleetManager;
   private configManager: ConfigManager;
+  private taskExecutor: TaskExecutor;
 
   constructor(options: CLIOptions = {}) {
     this.isGlobal = options.isGlobal || false;
@@ -49,6 +51,20 @@ export class CLICommands {
     this.authManager = new AuthManager(this.carrierPath);
     this.remoteFleetManager = new RemoteFleetManager(this.carrierPath, this.authManager);
     this.configManager = new ConfigManager(this.carrierPath);
+
+    // Initialize task executor with provider system
+    this.taskExecutor = new TaskExecutor(this.carrier, this.carrierPath, {
+      isGlobal: this.isGlobal,
+      providerOptions: {
+        claude: {
+          carrierPath: this.carrierPath,
+          isGlobal: this.isGlobal,
+          permissionMode: 'acceptEdits',
+          model: 'claude-3-5-sonnet-20241022',
+          cwd: process.cwd()
+        }
+      }
+    });
   }
 
   async init(params: string[]): Promise<void> {
@@ -171,11 +187,7 @@ export class CLICommands {
   }
 
   async execute(params: string[]): Promise<void> {
-    return commands.execute(this.carrier, params);
-  }
-
-  async executeTask(params: string[]): Promise<void> {
-    return commands.executeTask(this.carrier, params);
+    return commands.execute(this.carrier, params, this.carrierPath);
   }
 
   async clean(params: string[]): Promise<void> {

@@ -3,7 +3,6 @@ export { whoami } from './whoami.js';
 export { logout } from './logout.js';
 export { deploy } from './deploy.js';
 export { execute } from './execute.js';
-export { executeTask } from './execute-task.js';
 export { approve } from './approve.js';
 export { status } from './status.js';
 export { ls } from './ls.js';

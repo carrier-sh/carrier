@@ -1,13 +1,10 @@
 /**
  * Centralized Task Execution System
- * Handles task deployment with any AI provider, managing inputs, outputs, and context
+ * Now uses provider-based execution for all tasks
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import fs from 'fs';
-import path from 'path';
 import { CarrierCore } from './core.js';
-import { ProviderRegistryManager } from './providers/provider-registry.js';
+import { TaskDispatcher, TaskDispatcherOptions } from './task-dispatcher.js';
 import { TaskConfig, TaskResult } from './types/index.js';
 
 export interface TaskExecutionOptions {
@@ -30,21 +27,34 @@ export interface TaskExecutionResult {
 }
 
 export class TaskExecutor {
-  private carrier: CarrierCore;
-  private providerRegistry: ProviderRegistryManager;
+  private core: CarrierCore;
+  private dispatcher: TaskDispatcher;
 
-  constructor(carrier: CarrierCore) {
-    this.carrier = carrier;
-    this.providerRegistry = new ProviderRegistryManager();
+  constructor(core: CarrierCore, carrierPath?: string, dispatcherOptions?: TaskDispatcherOptions) {
+    this.core = core;
+
+    // Initialize task dispatcher with centralized provider management
+    this.dispatcher = new TaskDispatcher({
+      carrierPath,
+      isGlobal: dispatcherOptions?.isGlobal || false,
+      defaultProvider: 'claude',
+      providerOptions: dispatcherOptions?.providerOptions,
+      ...dispatcherOptions
+    });
   }
 
   /**
-   * Execute a task with full context handling (inputs, outputs, agent configuration)
+   * Execute a task using the centralized provider system
    */
   async executeTask(options: TaskExecutionOptions): Promise<TaskExecutionResult> {
     try {
+      console.log(`\n🎯 Task Executor: Starting task ${options.taskId}`);
+      console.log(`📋 Deployment: ${options.deployedId}`);
+      console.log(`🤖 Agent: ${options.agentType}`);
+      console.log(`⚙️  Provider: ${options.provider || 'default'}\n`);
+
       // Load deployment and fleet context
-      const deployed = this.carrier.getDeployedFleet(options.deployedId);
+      const deployed = this.core.getDeployedFleet(options.deployedId);
       if (!deployed) {
         return {
           success: false,
@@ -52,7 +62,7 @@ export class TaskExecutor {
         };
       }
 
-      const fleet = this.carrier.loadFleet(deployed.fleetId);
+      const fleet = this.core.loadFleet(deployed.fleetId);
       const task = fleet.tasks.find(t => t.id === options.taskId);
       if (!task) {
         return {
@@ -61,21 +71,26 @@ export class TaskExecutor {
         };
       }
 
-      // Build enhanced prompt with context
-      const enhancedPrompt = await this.buildTaskPrompt(options, task, deployed);
+      // Build task configuration for provider
+      const taskConfig: TaskConfig = {
+        deployedId: options.deployedId,
+        taskId: options.taskId,
+        agentType: options.agentType,
+        prompt: options.prompt,
+        timeout: options.timeout || 300,
+        maxTurns: 10,
+        model: options.model
+      };
 
       // Update task status to active
-      await this.carrier.updateTaskStatus(options.deployedId, options.taskId, 'active');
+      await this.core.updateTaskStatus(options.deployedId, options.taskId, 'active');
 
-      // Execute based on mode
-      if (options.interactive) {
-        return await this.executeInteractive(options, enhancedPrompt);
-      } else if (options.background) {
-        return await this.executeBackground(options, enhancedPrompt);
-      } else {
-        // Default to interactive
-        return await this.executeInteractive(options, enhancedPrompt);
-      }
+      // Execute through provider system
+      const taskResult = await this.dispatcher.executeTask(taskConfig, options.provider);
+
+      // Handle task completion and transition
+      return await this.handleTaskCompletion(options, taskResult);
+
     } catch (error) {
       return {
         success: false,
@@ -85,165 +100,16 @@ export class TaskExecutor {
   }
 
   /**
-   * Execute task interactively with direct Claude CLI
-   */
-  private async executeInteractive(options: TaskExecutionOptions, prompt: string): Promise<TaskExecutionResult> {
-    console.log(`\nLaunching interactive Claude Code session for task: ${options.taskId}`);
-    console.log(`Agent: ${options.agentType}`);
-    console.log('(Press Ctrl+C to cancel)\n');
-
-    // Use direct Claude CLI call for interactive mode
-    const child = spawn('claude', [prompt], {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        CARRIER_TASK_ID: options.taskId,
-        CARRIER_DEPLOYED_ID: options.deployedId,
-        CARRIER_AGENT_TYPE: options.agentType
-      }
-    });
-
-    // Store process info
-    await this.carrier.updateTaskProcessInfo(options.deployedId, options.taskId, child.pid || 0);
-
-    // Wait for process to complete
-    const exitCode = await new Promise<number>((resolve) => {
-      child.on('exit', (code) => {
-        resolve(code || 0);
-      });
-
-      child.on('error', (err) => {
-        console.error(`Error launching task: ${err.message}`);
-        resolve(1);
-      });
-    });
-
-    // Handle task completion and transition
-    return await this.handleTaskCompletion(options, exitCode);
-  }
-
-  /**
-   * Execute task in background with output capture
-   */
-  private async executeBackground(options: TaskExecutionOptions, prompt: string): Promise<TaskExecutionResult> {
-    // Create log files for output capture
-    const logDir = path.join(this.carrier['carrierPath'], 'deployed', options.deployedId, 'logs');
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-
-    const stdoutFile = path.join(logDir, `${options.taskId}.stdout.log`);
-    const stderrFile = path.join(logDir, `${options.taskId}.stderr.log`);
-
-    // Launch Claude CLI in background with output redirection
-    const child = spawn('claude', [prompt], {
-      detached: true,
-      stdio: [
-        'ignore',
-        fs.openSync(stdoutFile, 'a'),
-        fs.openSync(stderrFile, 'a')
-      ],
-      env: {
-        ...process.env,
-        CARRIER_TASK_ID: options.taskId,
-        CARRIER_DEPLOYED_ID: options.deployedId,
-        CARRIER_AGENT_TYPE: options.agentType
-      }
-    });
-
-    // Store process info
-    await this.carrier.updateTaskProcessInfo(options.deployedId, options.taskId, child.pid || 0);
-
-    // Unref to allow parent to exit
-    child.unref();
-
-    console.log(`\nTask ${options.taskId} launched in background (PID: ${child.pid})`);
-    console.log(`Logs: ${stdoutFile}`);
-    console.log(`Check status with: carrier status ${options.deployedId}`);
-
-    return {
-      success: true,
-      message: `Task ${options.taskId} launched in background`
-    };
-  }
-
-  /**
-   * Build enhanced prompt with task context, inputs, and output instructions
-   */
-  private async buildTaskPrompt(
-    options: TaskExecutionOptions,
-    task: any,
-    deployed: any
-  ): Promise<string> {
-    let prompt = `[Carrier Task Execution]
-Deployment ID: ${options.deployedId}
-Task ID: ${options.taskId}
-Agent Type: ${options.agentType}
-Fleet: ${deployed.fleetId}
-
-`;
-
-    // Add task description
-    if (task.description) {
-      prompt += `Task Description: ${task.description}\n\n`;
-    }
-
-    // Add user request context
-    prompt += `User Request: ${deployed.request}\n\n`;
-
-    // Add task inputs
-    if (task.inputs && task.inputs.length > 0) {
-      prompt += `Available Inputs:\n`;
-      for (const input of task.inputs) {
-        if (input.type === 'output' && input.source) {
-          try {
-            const outputContent = this.carrier.loadTaskOutput(options.deployedId, input.source);
-            prompt += `- ${input.source} output:\n${outputContent}\n\n`;
-          } catch {
-            prompt += `- ${input.source} output: (not available yet)\n`;
-          }
-        } else if (input.type === 'user_prompt') {
-          prompt += `- User prompt: ${deployed.request}\n`;
-        }
-      }
-      prompt += '\n';
-    }
-
-    // Add output instructions
-    if (task.outputs && task.outputs.length > 0) {
-      prompt += `Required Outputs:\n`;
-      for (const output of task.outputs) {
-        const outputPath = path.join('.carrier', 'deployed', options.deployedId, 'outputs', output.path);
-        prompt += `- ${output.type}: Write to ${outputPath}\n`;
-      }
-      prompt += '\n';
-    }
-
-    // Add the main task prompt
-    prompt += `Main Task:\n${options.prompt}\n\n`;
-
-    // Add agent instructions
-    prompt += `Please use the Task tool with the following parameters:
-- subagent_type: ${options.agentType}
-- description: "Task ${options.taskId} for deployment ${options.deployedId}"
-- prompt: "Execute the task described above with all provided context"
-
-Execute this task now and provide the results.`;
-
-    return prompt;
-  }
-
-  /**
    * Handle task completion and automatic transitions
    */
-  private async handleTaskCompletion(options: TaskExecutionOptions, exitCode: number): Promise<TaskExecutionResult> {
-    if (exitCode === 0) {
-      await this.carrier.updateTaskStatus(options.deployedId, options.taskId, 'complete');
-      console.log(`\nTask ${options.taskId} completed successfully`);
+  private async handleTaskCompletion(options: TaskExecutionOptions, taskResult: TaskResult): Promise<TaskExecutionResult> {
+    if (taskResult.success) {
+      await this.core.updateTaskStatus(options.deployedId, options.taskId, 'complete');
+      console.log(`\n✅ Task ${options.taskId} completed successfully`);
 
       // Check for automatic task transition
-      const deployed = this.carrier.getDeployedFleet(options.deployedId);
-      const fleet = this.carrier.loadFleet(deployed!.fleetId);
+      const deployed = this.core.getDeployedFleet(options.deployedId);
+      const fleet = this.core.loadFleet(deployed!.fleetId);
       const currentTask = fleet.tasks.find(t => t.id === options.taskId);
       const nextTaskRef = currentTask?.nextTasks?.find(nt => nt.condition === 'success');
 
@@ -251,48 +117,121 @@ Execute this task now and provide the results.`;
         // Transition to next task
         const nextTask = fleet.tasks.find(t => t.id === nextTaskRef.taskId);
         if (nextTask) {
-          console.log(`\nAutomatically transitioning to next task: ${nextTask.id}`);
-          await this.carrier.updateDeployedStatus(options.deployedId, 'active', nextTask.id, nextTask.agent);
+          console.log(`\n➡️  Automatically transitioning to next task: ${nextTask.id}`);
+          await this.core.updateDeployedStatus(options.deployedId, 'active', nextTask.id, nextTask.agent);
           console.log(`Use "carrier execute ${options.deployedId}" to continue with ${nextTask.id}`);
         }
       } else if (nextTaskRef?.taskId === 'complete') {
         // Fleet completed
-        await this.carrier.updateDeployedStatus(options.deployedId, 'complete');
-        console.log(`\nFleet ${options.deployedId} completed successfully!`);
+        await this.core.updateDeployedStatus(options.deployedId, 'complete');
+        console.log(`\n🎉 Fleet ${options.deployedId} completed successfully!`);
       }
 
       return {
         success: true,
-        message: `Task ${options.taskId} completed successfully`
+        message: `Task ${options.taskId} completed successfully`,
+        taskResult
       };
     } else {
-      await this.carrier.updateTaskStatus(options.deployedId, options.taskId, 'failed');
+      await this.core.updateTaskStatus(options.deployedId, options.taskId, 'failed');
       return {
         success: false,
-        message: `Task ${options.taskId} failed with exit code ${exitCode}`
+        message: `Task ${options.taskId} failed: ${taskResult.error || 'Unknown error'}`,
+        error: taskResult.error,
+        taskResult
       };
     }
   }
 
   /**
-   * Get available AI providers
+   * Get available providers
    */
   async getAvailableProviders(): Promise<Record<string, boolean>> {
-    return await this.providerRegistry.getProviderStatus();
+    return await this.dispatcher.getProviderStatus();
   }
 
   /**
-   * Stream task output for monitoring
+   * Get provider information
+   */
+  getProviderInfo(): Array<{
+    name: string;
+    displayName: string;
+    version: string;
+    isDefault: boolean;
+    isAvailable: Promise<boolean>;
+    config: any;
+  }> {
+    return this.dispatcher.getProviderInfo();
+  }
+
+  /**
+   * Get available models for a provider
+   */
+  async getAvailableModels(provider?: string): Promise<string[]> {
+    return await this.dispatcher.getAvailableModels(provider);
+  }
+
+  /**
+   * Set default provider
+   */
+  setDefaultProvider(provider: string): boolean {
+    return this.dispatcher.setDefaultProvider(provider);
+  }
+
+  /**
+   * Stream task output for monitoring (for background tasks)
    */
   streamTaskOutput(deployedId: string, taskId: string): void {
-    const logPath = path.join(this.carrier['carrierPath'], 'deployed', deployedId, 'logs', `${taskId}.stdout.log`);
+    console.log(`\n--- Task ${taskId} Output ---`);
 
-    if (fs.existsSync(logPath)) {
-      console.log(`\n--- Task ${taskId} Output ---`);
-      const content = fs.readFileSync(logPath, 'utf-8');
-      console.log(content);
-    } else {
-      console.log(`No output log found for task ${taskId}`);
+    try {
+      const output = this.core.loadTaskOutput(deployedId, taskId);
+      console.log(output);
+    } catch (error) {
+      console.log(`No output available for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * Show detailed provider status
+   */
+  async showProviderStatus(): Promise<void> {
+    console.log('\n🔌 Provider Status:\n');
+
+    const providers = this.dispatcher.getProviderInfo();
+
+    for (const provider of providers) {
+      const isAvailable = await provider.isAvailable;
+      const status = isAvailable ? '✅' : '❌';
+      const defaultMarker = provider.isDefault ? ' (default)' : '';
+
+      console.log(`${status} ${provider.displayName} v${provider.version}${defaultMarker}`);
+      console.log(`   Name: ${provider.name}`);
+
+      if (isAvailable) {
+        const models = await this.dispatcher.getAvailableModels(provider.name);
+        console.log(`   Models: ${models.join(', ')}`);
+      } else {
+        console.log(`   Status: Not available`);
+      }
+      console.log();
+    }
+  }
+
+  /**
+   * Execute a task interactively (legacy support for backward compatibility)
+   */
+  async executeInteractive(options: TaskExecutionOptions): Promise<TaskExecutionResult> {
+    // All execution now goes through the provider system
+    return this.executeTask(options);
+  }
+
+  /**
+   * Execute a task in background (legacy support for backward compatibility)
+   */
+  async executeBackground(options: TaskExecutionOptions): Promise<TaskExecutionResult> {
+    // Background execution still uses provider system but with different output handling
+    options.background = true;
+    return this.executeTask(options);
   }
 }

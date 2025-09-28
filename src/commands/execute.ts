@@ -3,7 +3,8 @@ import { TaskExecutor } from '../task-executor.js';
 
 export async function execute(
   carrier: CarrierCore,
-  params: string[]
+  params: string[],
+  carrierPath?: string
 ): Promise<void> {
   const deployedId = params[0];
   const isBackground = params.includes('--background');
@@ -43,8 +44,8 @@ export async function execute(
     console.log(`  Agent Type: ${agentType}`);
     console.log(`  Request: ${request}\n`);
 
-    // Use centralized task executor
-    const taskExecutor = new TaskExecutor(carrier);
+    // Use centralized task executor with SDK integration
+    const taskExecutor = new TaskExecutor(carrier, carrierPath);
     const taskResult = await taskExecutor.executeTask({
       deployedId: deployedId,
       taskId: currentTaskId,
