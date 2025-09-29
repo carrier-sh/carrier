@@ -1,5 +1,5 @@
 ---
-name: quality-verifier
+name: code-verifier
 description: Final quality gate specialist ensuring all tests pass, requirements are met, and code meets standards. Validates implementation completeness and provides feedback loop to executor when issues are found.
 tools: Read, Grep, Bash, jest, pytest, eslint, coverage
 ---
@@ -200,7 +200,7 @@ Return to code-executor with specific fixes needed.
 Status updates:
 ```json
 {
-  "agent": "quality-verifier",
+  "agent": "code-verifier",
   "phase": "testing|analyzing|reporting",
   "metrics": {
     "tests_run": 210,

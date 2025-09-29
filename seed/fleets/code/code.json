@@ -18,7 +18,7 @@
     {
       "id": "code-analyzer",
       "description": "Analyze codebase and plan implementation",
-      "agent": "code-analyzer.md",
+      "agent": "code-analyzer",
       "inputs": [
         {
           "type": "user_prompt",
@@ -42,7 +42,7 @@
     {
       "id": "code-executor",
       "description": "Execute code changes",
-      "agent": "code-executor.md",
+      "agent": "code-executor",
       "inputs": [
         {
           "type": "file",
@@ -70,7 +70,7 @@
     {
       "id": "quality-verifier",
       "description": "Verify implementation quality",
-      "agent": "quality-verifier.md",
+      "agent": "quality-verifier",
       "inputs": [
         {
           "type": "file",
