@@ -234,6 +234,21 @@ export const COMMANDS: Record<string, Command> = {
     ],
     category: 'core',
     requiresInit: true
+  },
+
+  'stop': {
+    name: 'stop',
+    aliases: ['cancel'],
+    description: 'Stop/cancel a running deployment',
+    usage: 'carrier stop <deployment-id> [--force]',
+    examples: [
+      'carrier stop 5                   # Stop deployment 5 with confirmation',
+      'carrier stop 5 --force           # Force stop without confirmation',
+      'carrier stop --all               # Stop all active deployments',
+      'carrier cancel 5                 # Same as stop (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
   }
 };
 

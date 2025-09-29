@@ -80,7 +80,8 @@ export async function status(
         'active': '▶️',
         'awaiting_approval': '⏸️',
         'complete': '✅',
-        'failed': '❌'
+        'failed': '❌',
+        'cancelled': '🚫'
       };
       
       console.log(`\n${statusEmoji[deployed.status as keyof typeof statusEmoji]} Deployment: ${deployed.id}`);
@@ -104,7 +105,8 @@ export async function status(
           'active': '▶️',
           'awaiting_approval': '⏸️',
           'complete': '✅',
-          'failed': '❌'
+          'failed': '❌',
+          'cancelled': '🚫'
         };
         
         const isCurrent = deployed.currentTask === task.id;

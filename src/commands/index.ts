@@ -17,3 +17,4 @@ export { clean } from './clean.js';
 export { watchLogs } from './watch-logs.js';
 export { watch } from './watch.js';
 export { logs } from './logs.js';
+export { stop } from './stop.js';

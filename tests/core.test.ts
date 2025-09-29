@@ -41,6 +41,7 @@ describe('Core Commands', () => {
     expect(stdout).toContain('test-fleet');
   });
 
+  // Test that the rm command properly removes fleet directories
   test('rm removes fleet', async () => {
     await runCarrier(['init', '--no-claude']);
     

@@ -54,16 +54,23 @@ export class CLIParser {
       
       // Parse flags
       if (arg.startsWith('--')) {
-        const flagName = arg.slice(2);
-        
+        let flagName = arg.slice(2);
+        let flagValue: string | boolean = true;
+
+        // Check for --flag=value format
+        if (flagName.includes('=')) {
+          const parts = flagName.split('=');
+          flagName = parts[0];
+          flagValue = parts.slice(1).join('='); // Handle values with = in them
+        }
         // Check if next arg is a value for this flag
-        if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-          result.flags[flagName] = args[i + 1];
-          i += 2;
-        } else {
-          result.flags[flagName] = true;
+        else if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+          flagValue = args[i + 1];
           i++;
         }
+
+        result.flags[flagName] = flagValue;
+        i++;
       } else if (arg.startsWith('-')) {
         // Short flags
         const flagName = arg.slice(1);
@@ -166,6 +173,8 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
   ],
   deploy: [
     { name: 'background', description: 'Run task in background mode' },
+    { name: 'detach', description: 'Run fleet in background (returns immediately)', shorthand: 'd' },
+    { name: 'watch', description: 'Deploy with live monitoring', shorthand: 'w' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   approve: [
@@ -175,6 +184,8 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
   status: [
     { name: 'verbose', description: 'Show detailed status information', shorthand: 'v' },
     { name: 'json', description: 'Output status in JSON format' },
+    { name: 'all', description: 'Show all deployments', shorthand: 'a' },
+    { name: 'streams', description: 'Include stream activity summary' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   ls: [
@@ -226,6 +237,30 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
   'clean': [
     { name: 'keep-outputs', description: 'Keep task outputs when cleaning up' },
     { name: 'force', description: 'Skip confirmation when removing all completed deployments', shorthand: 'f' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'watch': [
+    { name: 'no-follow', description: "Don't follow new output (like tail without -f)" },
+    { name: 'tail', description: 'Number of lines to show from existing logs (default: 20)' },
+    { name: 'filter', description: 'Filter output by regex pattern' },
+    { name: 'format', description: 'Output format: pretty (default), json, raw' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'logs': [
+    { name: 'follow', description: 'Follow log output (like tail -f)', shorthand: 'f' },
+    { name: 'tail', description: 'Number of lines to show (default: all)' },
+    { name: 'streams', description: 'Show detailed stream events' },
+    { name: 'json', description: 'Output logs in JSON format' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'stop': [
+    { name: 'force', description: 'Force stop without confirmation', shorthand: 'f' },
+    { name: 'all', description: 'Stop all active deployments' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'cancel': [
+    { name: 'force', description: 'Force stop without confirmation', shorthand: 'f' },
+    { name: 'all', description: 'Stop all active deployments' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   help: []

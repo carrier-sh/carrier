@@ -44,7 +44,8 @@ export async function watch(
   console.log(`📊 Status: ${deployed.status}`);
 
   if (follow) {
-    console.log(`\n👀 Watching for activity (press Ctrl+C to stop)...`);
+    console.log(`\n👀 Watching for activity...`);
+    console.log(`   Press Ctrl+C to stop watching`);
     console.log(`────────────────────────────────────────────────\n`);
   } else {
     console.log(`\n📜 Showing recent activity:`);

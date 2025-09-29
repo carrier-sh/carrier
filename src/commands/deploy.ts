@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { CarrierCore } from '../core.js';
 import { TaskExecutor } from '../task-executor.js';
 import { StreamManager } from '../stream-manager.js';
@@ -11,7 +12,8 @@ export async function deploy(
   const fleetId = params[0];
   const isBackground = params.includes('--background');
   const isDetached = params.includes('--detach') || params.includes('-d');
-  const shouldWatch = params.includes('--watch') || params.includes('-w');
+  const noWatch = params.includes('--no-watch');  // Option to disable default watch behavior
+  const shouldWatch = !isDetached && !noWatch;  // Watch by default unless detached or explicitly disabled
 
   // Remove flags from params to get the request
   const requestParams = params.filter(p =>
@@ -23,12 +25,12 @@ export async function deploy(
     console.error('Usage: carrier deploy <fleet-id> "<request>" [options]');
     console.error('\nOptions:');
     console.error('  --detach, -d     Run fleet in background (returns immediately)');
-    console.error('  --watch, -w      Deploy and immediately watch the output');
+    console.error('  --no-watch       Disable live monitoring (watch is enabled by default)');
     console.error('  --background     Legacy: Run in background mode');
     console.error('\nExamples:');
-    console.error('  carrier deploy code-change "Add dark mode"');
-    console.error('  carrier deploy code-change "Add dark mode" --detach');
-    console.error('  carrier deploy code-change "Add dark mode" --watch');
+    console.error('  carrier deploy code-change "Add dark mode"         # Deploy with live monitoring (default)');
+    console.error('  carrier deploy code-change "Add dark mode" --detach # Deploy in background');
+    console.error('  carrier deploy code-change "Add dark mode" --no-watch # Deploy without monitoring');
     return;
   }
 
@@ -62,18 +64,23 @@ export async function deploy(
           console.log(`📈 Check status: carrier status ${result.data.id}`);
           console.log(`📜 View logs: carrier logs ${result.data.id}`);
 
-          // Start task execution in background (fire and forget)
-          const taskExecutor = new TaskExecutor(carrier, carrierPath);
-          taskExecutor.executeTask({
-            deployedId: result.data.id,
-            taskId: firstTask.id,
-            agentType: firstTask.agent,
-            prompt: request,
-            background: true,
-            interactive: false
-          }).catch(error => {
-            console.error(`Background task failed: ${error}`);
+          // Create a background execution script
+          const { spawn } = await import('child_process');
+
+          // Use the current process to execute in background
+          const child = spawn(process.argv[0], [
+            process.argv[1],
+            'execute',
+            result.data.id,
+            '--background'
+          ], {
+            detached: true,
+            stdio: 'ignore',
+            env: process.env
           });
+
+          // Unref the child so parent can exit
+          child.unref();
 
           // Exit immediately
           return;
@@ -99,6 +106,7 @@ export async function deploy(
           await new Promise(resolve => setTimeout(resolve, 500));
 
           console.log(`\n👀 Watching deployment ${result.data.id}...`);
+          console.log(`   Press Ctrl+C to stop watching`);
           console.log(`────────────────────────────────────────────────\n`);
 
           // Watch the deployment

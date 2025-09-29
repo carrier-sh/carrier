@@ -210,6 +210,10 @@ export class CLICommands {
     return commands.logs(this.carrier, this.carrierPath, params);
   }
 
+  async stop(params: string[]): Promise<void> {
+    return commands.stop(this.carrier, this.carrierPath, params);
+  }
+
   // Helper methods that are still needed by init and other commands
   private async copySeedFiles(): Promise<void> {
     const seedPath = path.join(__dirname, '..', 'seed');

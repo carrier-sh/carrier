@@ -4,6 +4,8 @@
  * Carrier CLI - Simplified version using CLICommands
  */
 
+// Test comment added for verification
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from './core.js';
@@ -136,6 +138,15 @@ async function handleCommand() {
     case 'clean':
     case 'cleanup':
       return await cli.clean(allParams);
+    case 'watch-logs':
+      return await cli.watchLogs(allParams);
+    case 'watch':
+      return await cli.watch(allParams);
+    case 'logs':
+      return await cli.logs(allParams);
+    case 'stop':
+    case 'cancel':
+      return await cli.stop(allParams);
     case 'help':
       return await cli.help(params);
     default:
