@@ -64,8 +64,14 @@ export type {
   CommandFlag
 } from './cli.js';
 
-// Re-export commonly used types for convenience
+// Logging types
 export type {
-  // Legacy compatibility - mark as deprecated
-  DeploymentInfo as DeployedInfo,
-} from './core.js';
+  LogEntryType,
+  LogEntry,
+  ToolCallLog,
+  SystemEventLog,
+  ErrorLog,
+  MessageLog,
+  TaskExecutionSummary
+} from './logs.js';
+

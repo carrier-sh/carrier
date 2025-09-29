@@ -217,12 +217,26 @@ export class TaskExecutor {
     const path = await import('path');
 
     const carrierPath = this.core['carrierPath'];
-    const jsonLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}_latest.json`);
-    const summaryLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}_summary.md`);
-    const sessionLogPath = path.join(carrierPath, 'deployed', deployedId, 'logs', `${taskId}-session.log`);
+    const logsDir = path.join(carrierPath, 'deployed', deployedId, 'logs');
+    const summaryLogPath = path.join(logsDir, `${taskId}_summary.json`);
+    const sessionLogPath = path.join(logsDir, `${taskId}-session.log`);
+
+    // Find the most recent JSON log file for the task
+    let jsonLogPath: string | null = null;
+
+    if (fs.existsSync(logsDir)) {
+      const logFiles = fs.readdirSync(logsDir);
+      const jsonLogs = logFiles
+        .filter((f: string) => f.startsWith(`${taskId}_`) && f.endsWith('.json') && !f.includes('_summary'))
+        .sort((a: string, b: string) => b.localeCompare(a)); // Sort descending to get latest first
+
+      if (jsonLogs.length > 0) {
+        jsonLogPath = path.join(logsDir, jsonLogs[0]);
+      }
+    }
 
     // Try JSON log first (new format)
-    if (fs.existsSync(jsonLogPath)) {
+    if (jsonLogPath && fs.existsSync(jsonLogPath)) {
       console.log(`\n👁️  Watching JSON logs for task ${taskId}`);
       console.log(`📝 Log file: ${jsonLogPath}`);
       if (fs.existsSync(summaryLogPath)) {
@@ -246,7 +260,7 @@ export class TaskExecutor {
 
         // Wait for file to be created (with timeout)
         let attempts = 0;
-        while (!fs.existsSync(sessionLogPath) && !fs.existsSync(jsonLogPath) && attempts < 30) {
+        while (!fs.existsSync(sessionLogPath) && attempts < 30) {
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempts++;
 
@@ -344,7 +358,7 @@ export class TaskExecutor {
 
       // Categorize log files
       const jsonLogs = logFiles.filter((f: string) => f.endsWith('.json') && !f.includes('_latest'));
-      const summaryLogs = logFiles.filter((f: string) => f.endsWith('_summary.md'));
+      const summaryLogs = logFiles.filter((f: string) => f.endsWith('_summary.json'));
       const sessionLogs = logFiles.filter((f: string) => f.endsWith('-session.log'));
       const latestLinks = logFiles.filter((f: string) => f.includes('_latest'));
 
@@ -363,7 +377,7 @@ export class TaskExecutor {
       if (summaryLogs.length > 0) {
         console.log('📄 Summary Logs:');
         summaryLogs.forEach((file: string) => {
-          const taskId = file.replace('_summary.md', '');
+          const taskId = file.replace('_summary.json', '');
           console.log(`  • ${taskId}: ${file}`);
         });
         console.log('');
@@ -517,16 +531,17 @@ export class TaskExecutor {
    */
   private displayLogEntry(entry: any): void {
     const time = new Date(entry.timestamp).toLocaleTimeString();
-    const typeEmoji = {
+    const typeEmoji: Record<string, string> = {
       'message': '💬',
       'tool_call': '🔧',
       'tool_result': '✅',
       'thinking': '🤔',
       'error': '❌',
       'system': '⚙️'
-    }[entry.type] || '📝';
+    };
+    const emoji = typeEmoji[entry.type] || '📝';
 
-    console.log(`${time} ${typeEmoji} [${entry.type}]`);
+    console.log(`${time} ${emoji} [${entry.type}]`);
 
     if (entry.type === 'tool_call' && entry.content) {
       console.log(`  Tool: ${entry.content.name}`);
