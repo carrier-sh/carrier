@@ -45,7 +45,7 @@
         {"type": "output", "source": "plan-executor"},
         {"type": "user_prompt", "source": "request"}
       ],
-      "outputs": [{"type": "file", "path": "validation.md"}],
+      "outputs": [{"type": "file", "path": "plan-validator.md"}],
       "approval_required": false,
       "nextTasks": [
         {

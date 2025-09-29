@@ -27,7 +27,7 @@
       ],
       "outputs": [
         {
-          "path": "analysis.md",
+          "path": "code-analyzer.md",
           "type": "file"
         }
       ],
@@ -46,7 +46,7 @@
       "inputs": [
         {
           "type": "file",
-          "source": "analysis.md"
+          "source": "code-analyzer.md"
         },
         {
           "type": "user_prompt",
@@ -55,7 +55,7 @@
       ],
       "outputs": [
         {
-          "path": "implementation.md",
+          "path": "code-executor.md",
           "type": "file"
         }
       ],
@@ -74,16 +74,16 @@
       "inputs": [
         {
           "type": "file",
-          "source": "implementation.md"
+          "source": "code-executor.md"
         },
         {
           "type": "file",
-          "source": "analysis.md"
+          "source": "code-analyzer.md"
         }
       ],
       "outputs": [
         {
-          "path": "FINAL.md",
+          "path": "quality-verifier.md",
           "type": "file"
         }
       ],

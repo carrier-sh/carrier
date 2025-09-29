@@ -187,18 +187,44 @@ Continue from where the previous tasks left off.`;
 
   console.log('\n🚀 Resuming task execution...');
 
-  // Execute the task with context
+  // Execute the task in background mode
   const taskResult = await taskExecutor.executeTask({
     deployedId: deployedId,
     taskId: taskToResume.id,
     agentType: taskToResume.agent,
     prompt: contextPrompt,
-    background: false,
-    interactive: true
+    background: true,  // Run in background
+    interactive: false // Not interactive
   });
 
   if (taskResult.success) {
-    console.log(`\n✅ Deployment ${deployedId} resumed successfully`);
+    console.log(`\n✅ Deployment ${deployedId} resumed in background`);
+
+    // Now watch the output (with graceful Ctrl+C handling)
+    console.log('\n📡 Watching output... (Press Ctrl+C to detach)\n');
+
+    const { StreamManager } = await import('../stream-manager.js');
+    const streamManager = new StreamManager(carrierPath);
+
+    // Set up Ctrl+C handler to detach gracefully
+    const detachHandler = () => {
+      console.log('\n\n👋 Detaching from deployment (task continues running)');
+      console.log(`\n📋 Task continues in background`);
+      console.log(`📡 Resume watching: carrier watch ${deployedId}`);
+      console.log(`📈 Check status: carrier status ${deployedId}`);
+      console.log(`📜 View logs: carrier logs ${deployedId}`);
+      process.exit(0);
+    };
+
+    process.on('SIGINT', detachHandler);
+
+    // Watch the stream
+    await streamManager.watchStream(deployedId, {
+      follow: true,
+      tail: 50,
+      format: 'pretty'
+    });
+
   } else {
     console.error(`\n❌ Failed to resume deployment: ${taskResult.message}`);
   }
