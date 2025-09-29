@@ -250,15 +250,23 @@ export class TaskExecutor {
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempts++;
 
-          // Check again for JSON log
-          if (fs.existsSync(jsonLogPath)) {
-            console.log(`\n📝 Found JSON log: ${jsonLogPath}`);
-            await this.tailJsonLog(jsonLogPath);
-            return;
+          // Check again for JSON log in the logs directory
+          if (fs.existsSync(logsDir)) {
+            const logFiles = fs.readdirSync(logsDir);
+            const newJsonLogs = logFiles
+              .filter((f: string) => f.startsWith(`${taskId}_`) && f.endsWith('.json'))
+              .sort((a: string, b: string) => b.localeCompare(a));
+
+            if (newJsonLogs.length > 0) {
+              const newJsonLogPath = path.join(logsDir, newJsonLogs[0]);
+              console.log(`\n📝 Found JSON log: ${newJsonLogPath}`);
+              await this.tailJsonLog(newJsonLogPath);
+              return;
+            }
           }
         }
 
-        if (!fs.existsSync(sessionLogPath) && !fs.existsSync(jsonLogPath)) {
+        if (!fs.existsSync(sessionLogPath)) {
           console.log(`❌ Log file not found: ${sessionLogPath}`);
           return;
         }

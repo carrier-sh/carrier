@@ -261,13 +261,6 @@ Begin task execution now.`;
     const logFileName = `${config.taskId}_${timestamp}.json`;
     const logPath = path.join(logDir, logFileName);
 
-    // Create a symlink to the latest log for easy access
-    const latestLogPath = path.join(logDir, `${config.taskId}_latest.json`);
-    if (fs.existsSync(latestLogPath)) {
-      fs.unlinkSync(latestLogPath);
-    }
-    fs.symlinkSync(logFileName, latestLogPath);
-
     // Initialize log stream
     this.logStream = createWriteStream(logPath, { flags: 'w' });
     this.logEntries = [];
@@ -320,21 +313,99 @@ Begin task execution now.`;
     const toolCalls = this.logEntries.filter(e => e.type === 'tool_call');
     const errors = this.logEntries.filter(e => e.type === 'error');
     const messages = this.logEntries.filter(e => e.type === 'message');
+    const systemEvents = this.logEntries.filter(e => e.type === 'system');
+    const assistantMessages = messages.filter(m => m.content?.type === 'assistant');
+    const userMessages = messages.filter(m => m.content?.type === 'user');
+
+    // Get task start and complete events
+    const taskStart = systemEvents.find(e => e.content?.event === 'task_start');
+    const taskComplete = systemEvents.find(e => e.content?.event === 'task_complete');
+
+    // Format tool calls with full details
+    const formatToolCall = (tc: LogEntry): string => {
+      const time = new Date(tc.timestamp).toLocaleTimeString();
+      const name = tc.content?.name || 'unknown';
+      const input = tc.content?.input || {};
+
+      let details = `### ${time} - **${name}**\n`;
+
+      // Add formatted input based on tool type
+      if (input && typeof input === 'object') {
+        const entries = Object.entries(input);
+        if (entries.length > 0) {
+          details += '\n**Parameters:**\n';
+          entries.forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              let displayValue = value;
+              if (typeof value === 'string') {
+                // Truncate very long strings
+                displayValue = value.length > 500 ? value.substring(0, 500) + '...' : value;
+              } else if (typeof value === 'object') {
+                displayValue = JSON.stringify(value, null, 2);
+                if (displayValue.length > 500) {
+                  displayValue = displayValue.substring(0, 500) + '...';
+                }
+              }
+              details += `  - **${key}**: \`${displayValue}\`\n`;
+            }
+          });
+        }
+      }
+
+      return details;
+    };
+
+    // Format error with full details
+    const formatError = (err: LogEntry): string => {
+      const time = new Date(err.timestamp).toLocaleTimeString();
+      let details = `### ${time} - Error\n`;
+      if (err.content?.error) {
+        details += `**Message**: ${err.content.error}\n`;
+      }
+      if (err.content?.stack) {
+        details += `\n**Stack Trace**:\n\`\`\`\n${err.content.stack}\n\`\`\`\n`;
+      }
+      return details;
+    };
 
     const summary = `# Task Execution Summary: ${config.taskId}
 
 ## Overview
 - **Agent Type**: ${config.agentType}
 - **Deployment ID**: ${config.deployedId}
+- **Model**: ${taskStart?.content?.model || 'N/A'}
+- **Start Time**: ${taskStart ? new Date(taskStart.timestamp).toLocaleString() : 'N/A'}
+- **End Time**: ${taskComplete ? new Date(taskComplete.timestamp).toLocaleString() : 'N/A'}
+- **Duration**: ${taskComplete?.content?.duration ? `${taskComplete.content.duration}s` : 'N/A'}
+
+## Statistics
 - **Total Messages**: ${messages.length}
+- **Assistant Messages**: ${assistantMessages.length}
+- **User Messages**: ${userMessages.length}
 - **Tool Calls**: ${toolCalls.length}
 - **Errors**: ${errors.length}
+- **Turns**: ${taskComplete?.content?.turnCount || 'N/A'}
+- **Total Tokens**: ${taskComplete?.content?.totalTokens || 'N/A'}
 
-## Tool Usage
-${toolCalls.map(tc => `- ${new Date(tc.timestamp).toLocaleTimeString()}: ${JSON.stringify(tc.content?.name || tc.content)}`).join('\n')}
+## Initial Prompt
+\`\`\`
+${taskStart?.content?.prompt || 'N/A'}
+\`\`\`
 
-## Errors
-${errors.length > 0 ? errors.map(e => `- ${e.content?.error || e.content}`).join('\n') : 'No errors encountered'}
+## Tool Usage Details
+${toolCalls.length > 0 ? toolCalls.map(tc => formatToolCall(tc)).join('\n---\n\n') : 'No tools were called during this task.'}
+
+## Errors Encountered
+${errors.length > 0 ? errors.map(e => formatError(e)).join('\n---\n\n') : 'No errors encountered during execution.'}
+
+## Token Usage
+${taskComplete?.content?.usage ? `
+- **Input Tokens**: ${taskComplete.content.usage.input_tokens || 0}
+- **Output Tokens**: ${taskComplete.content.usage.output_tokens || 0}
+- **Cache Creation Tokens**: ${taskComplete.content.usage.cache_creation_input_tokens || 0}
+- **Cache Read Tokens**: ${taskComplete.content.usage.cache_read_input_tokens || 0}
+- **Total Tokens**: ${taskComplete.content.usage.total_tokens || 0}
+` : 'Token usage information not available.'}
 
 ---
 _Generated at ${new Date().toISOString()}_
