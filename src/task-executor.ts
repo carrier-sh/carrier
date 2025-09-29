@@ -6,6 +6,7 @@
 import { CarrierCore } from './core.js';
 import { TaskDispatcher, TaskDispatcherOptions } from './task-dispatcher.js';
 import { TaskConfig, TaskResult } from './types/index.js';
+import { DetachedExecutor } from './detached-executor.js';
 
 export interface TaskExecutionOptions {
   deployedId: string;
@@ -41,6 +42,46 @@ export class TaskExecutor {
       providerOptions: dispatcherOptions?.providerOptions,
       ...dispatcherOptions
     });
+  }
+
+  /**
+   * Execute a task in detached mode (returns immediately)
+   */
+  executeDetached(options: TaskExecutionOptions): TaskExecutionResult {
+    try {
+      console.log(`\n🎯 Task Executor: Starting detached task ${options.taskId}`);
+      console.log(`📋 Deployment: ${options.deployedId}`);
+      console.log(`🤖 Agent: ${options.agentType}`);
+      console.log(`⚙️  Provider: ${options.provider || 'default'}\n`);
+
+      // Create runner script
+      const scriptPath = DetachedExecutor.createRunnerScript({
+        carrierPath: this.core['carrierPath'],
+        deployedId: options.deployedId,
+        taskId: options.taskId,
+        agentType: options.agentType,
+        prompt: options.prompt,
+        provider: options.provider,
+        model: options.model
+      });
+
+      // Spawn detached process
+      DetachedExecutor.spawn(scriptPath, [], {
+        carrierPath: this.core['carrierPath'],
+        deployedId: options.deployedId,
+        taskId: options.taskId
+      });
+
+      return {
+        success: true,
+        message: `Task ${options.taskId} started in detached mode`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to start detached task: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
   }
 
   /**

@@ -50,27 +50,38 @@ export async function deploy(
       const firstTask = fleet.tasks[0];
 
       if (firstTask && firstTask.agent) {
-        // Start task execution (non-blocking)
         const taskExecutor = new TaskExecutor(carrier, carrierPath);
-        taskExecutor.executeTask({
-          deployedId: result.data.id,
-          taskId: firstTask.id,
-          agentType: firstTask.agent,
-          prompt: request,
-          background: true,
-          interactive: false
-        });
 
         if (isDetached) {
-          // Detached mode: Return immediately
-          console.log(`✨ Running in detached mode`);
-          console.log(`\nDeployment ID: ${result.data.id}`);
-          console.log(`Watch output: carrier watch ${result.data.id}`);
-          console.log(`View logs: carrier logs ${result.data.id}`);
-          console.log(`Check status: carrier status ${result.data.id}`);
-          console.log(`Stop deployment: carrier stop ${result.data.id}`);
+          // Detached mode: Start task in background and return immediately
+          const detachResult = taskExecutor.executeDetached({
+            deployedId: result.data.id,
+            taskId: firstTask.id,
+            agentType: firstTask.agent,
+            prompt: request
+          });
+
+          if (detachResult.success) {
+            console.log(`✨ Running in detached mode`);
+            console.log(`\nDeployment ID: ${result.data.id}`);
+            console.log(`Watch output: carrier watch ${result.data.id}`);
+            console.log(`View logs: carrier logs ${result.data.id}`);
+            console.log(`Check status: carrier status ${result.data.id}`);
+            console.log(`Stop deployment: carrier stop ${result.data.id}`);
+          } else {
+            console.error(`Failed to start detached task: ${detachResult.message}`);
+          }
           return;
         } else {
+          // Normal mode: Start task execution (non-blocking but we'll attach to it)
+          taskExecutor.executeTask({
+            deployedId: result.data.id,
+            taskId: firstTask.id,
+            agentType: firstTask.agent,
+            prompt: request,
+            background: true,
+            interactive: false
+          });
           // Default: Attach to output stream
           // Give process a moment to start
           await new Promise(resolve => setTimeout(resolve, 500));
