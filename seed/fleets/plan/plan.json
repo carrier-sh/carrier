@@ -6,11 +6,28 @@
   "outputs": [{"type": "fleet_result", "path": "result.md"}],
   "tasks": [
     {
-      "id": "plan-analyzer",
-      "description": "Analyze and plan the code change requirements",
-      "agent": "plan-analyzer",
+      "id": "plan-researcher",
+      "description": "Research repository to identify critical context for planning",
+      "agent": "plan-researcher",
       "inputs": [{"type": "user_prompt", "source": "request"}],
-      "outputs": [{"type": "file", "path": "requirements.md"}],
+      "outputs": [{"type": "file", "path": "research.md"}],
+      "approval_required": false,
+      "nextTasks": [
+        {
+          "taskId": "plan-executor",
+          "condition": "success"
+        }
+      ]
+    },
+    {
+      "id": "plan-executor",
+      "description": "Create comprehensive implementation plan based on research",
+      "agent": "plan-executor",
+      "inputs": [
+        {"type": "output", "source": "plan-researcher"},
+        {"type": "user_prompt", "source": "request"}
+      ],
+      "outputs": [{"type": "file", "path": "plan.md"}],
       "approval_required": false,
       "nextTasks": [
         {
@@ -21,10 +38,11 @@
     },
     {
       "id": "plan-validator",
-      "description": "Validate the requirements and plan",
+      "description": "Validate the implementation plan for completeness and feasibility",
       "agent": "plan-validator",
       "inputs": [
-        {"type": "output", "source": "plan-analyzer"},
+        {"type": "output", "source": "plan-researcher"},
+        {"type": "output", "source": "plan-executor"},
         {"type": "user_prompt", "source": "request"}
       ],
       "outputs": [{"type": "file", "path": "validation.md"}],
@@ -35,9 +53,9 @@
           "condition": "success"
         },
         {
-          "taskId": "plan-analyzer",
+          "taskId": "plan-executor",
           "condition": "failed",
-          "context": "validation_failed"
+          "context": "validation_failed_needs_revision"
         }
       ]
     }
