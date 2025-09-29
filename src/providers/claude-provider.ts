@@ -502,7 +502,8 @@ Begin task execution now.`;
       case 'result':
         if (message.subtype === 'success' && 'result' in message) {
           console.log(`\n✅ Task completed successfully`);
-          content = `\n\n## Result:\n${message.result}`;
+          // Append result instead of overwriting - the result is a summary
+          content = message.result ? `\n\n## Result:\n${message.result}` : '';
 
           if ('num_turns' in message) {
             turnCount = message.num_turns;

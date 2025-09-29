@@ -78,7 +78,7 @@ export class TaskExecutor {
         agentType: options.agentType,
         prompt: options.prompt,
         timeout: options.timeout || 300,
-        maxTurns: 10,
+        maxTurns: 25,  // Increased to allow research agents to complete extensive searches
         model: options.model
       };
 
