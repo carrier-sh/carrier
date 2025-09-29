@@ -122,11 +122,34 @@ export class TaskExecutor {
 
           // Actually execute the next task
           console.log(`\n🚀 Starting next task: ${nextTask.id} with agent: ${nextTask.agent}`);
+
+          // Build prompt with inputs from previous tasks
+          let nextPrompt = options.prompt; // Start with original request
+          if (nextTask.inputs) {
+            const inputSections: string[] = [];
+            for (const input of nextTask.inputs) {
+              if (input.type === 'file' && input.source) {
+                // Load the file from previous task outputs
+                try {
+                  const outputContent = this.core.loadTaskOutput(options.deployedId, input.source.replace('.md', ''));
+                  inputSections.push(`## Previous Task Output: ${input.source}\n\n${outputContent}`);
+                } catch (error) {
+                  console.warn(`Could not load input file ${input.source}: ${error}`);
+                }
+              }
+            }
+
+            // Combine original prompt with inputs
+            if (inputSections.length > 0) {
+              nextPrompt = `${options.prompt}\n\n${inputSections.join('\n\n')}`;
+            }
+          }
+
           const nextTaskResult = await this.executeTask({
             deployedId: options.deployedId,
             taskId: nextTask.id,
             agentType: nextTask.agent,
-            prompt: options.prompt, // Reuse the original prompt
+            prompt: nextPrompt, // Use enhanced prompt with inputs
             background: options.background,
             interactive: options.interactive,
             provider: options.provider,

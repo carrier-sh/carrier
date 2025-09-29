@@ -70,7 +70,7 @@
     {
       "id": "quality-verifier",
       "description": "Verify implementation quality",
-      "agent": "quality-verifier",
+      "agent": "code-verifier",
       "inputs": [
         {
           "type": "file",
