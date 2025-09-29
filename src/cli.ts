@@ -131,13 +131,9 @@ async function handleCommand() {
       return await cli.config(allParams);
     case 'uninstall':
       return await cli.uninstall(allParams);
-    case 'fleet':
-      return await cli.fleet(allParams);
     case 'clean':
     case 'cleanup':
       return await cli.clean(allParams);
-    case 'watch-logs':
-      return await cli.watchLogs(allParams);
     case 'watch':
       return await cli.watch(allParams);
     case 'logs':

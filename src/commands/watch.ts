@@ -39,6 +39,12 @@ export async function watch(
     return;
   }
 
+  // Check deployment status
+  if (deployed.status === 'complete' && !follow) {
+    console.log(`Deployment ${deployedId} is complete. Use 'carrier logs ${deployedId}' to view output.`);
+    return;
+  }
+
   console.log(`📡 Watching deployment: ${deployedId}`);
   console.log(`🚀 Fleet: ${deployed.fleetId}`);
   console.log(`📊 Status: ${deployed.status}`);

@@ -16,15 +16,17 @@ export async function resume(
   const deployedId = params[0];
   const force = params.includes('--force') || params.includes('-f');
   const fromStart = params.includes('--from-start');
+  const isDetached = params.includes('--detach') || params.includes('-d');
 
   if (!deployedId) {
     console.error('Usage: carrier resume <deployment-id> [options]');
     console.error('\nOptions:');
     console.error('  -f, --force        Resume without confirmation');
+    console.error('  -d, --detach       Resume in background (don\'t attach to output)');
     console.error('  --from-start       Restart from the beginning (re-run all tasks)');
     console.error('\nExamples:');
-    console.error('  carrier resume 5              # Resume deployment 5');
-    console.error('  carrier resume 5 --force      # Resume without confirmation');
+    console.error('  carrier resume 5              # Resume and attach to output');
+    console.error('  carrier resume 5 --detach     # Resume in background');
     console.error('  carrier resume 5 --from-start # Restart from first task');
     return;
   }
@@ -185,8 +187,8 @@ Continue from where the previous tasks left off.`;
 
   console.log('\n🚀 Resuming task execution...');
 
-  // Execute the task in background mode
-  const taskResult = await taskExecutor.executeTask({
+  // Start task execution (non-blocking)
+  taskExecutor.executeTask({
     deployedId: deployedId,
     taskId: taskToResume.id,
     agentType: taskToResume.agent,
@@ -195,22 +197,35 @@ Continue from where the previous tasks left off.`;
     interactive: false // Not interactive
   });
 
-  if (taskResult.success) {
-    console.log(`\n✅ Deployment ${deployedId} resumed in background`);
+  console.log(`✅ Deployment ${deployedId} resumed`);
 
-    // Now watch the output (with graceful Ctrl+C handling)
-    console.log('\n📡 Watching output... (Press Ctrl+C to detach)\n');
+  if (isDetached) {
+    // Detached mode: Return immediately
+    console.log(`✨ Running in detached mode`);
+    console.log(`\nDeployment ID: ${deployedId}`);
+    console.log(`Watch output: carrier watch ${deployedId}`);
+    console.log(`View logs: carrier logs ${deployedId}`);
+    console.log(`Check status: carrier status ${deployedId}`);
+    console.log(`Stop deployment: carrier stop ${deployedId}`);
+  } else {
+    // Default: Watch the output stream
+    // Give it a moment to start
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    console.log('\nStreaming output (Press Ctrl+C to detach)...');
+    console.log('────────────────────────────────────────────────\n');
 
     const { StreamManager } = await import('../stream-manager.js');
     const streamManager = new StreamManager(carrierPath);
 
     // Set up Ctrl+C handler to detach gracefully
     const detachHandler = () => {
-      console.log('\n\n👋 Detaching from deployment (task continues running)');
-      console.log(`\n📋 Task continues in background`);
-      console.log(`📡 Resume watching: carrier watch ${deployedId}`);
-      console.log(`📈 Check status: carrier status ${deployedId}`);
-      console.log(`📜 View logs: carrier logs ${deployedId}`);
+      console.log('\n\n✅ Detached from deployment');
+      console.log(`Deployment ${deployedId} continues running in background`);
+      console.log(`\nWatch output: carrier watch ${deployedId}`);
+      console.log(`Check status: carrier status ${deployedId}`);
+      console.log(`View logs: carrier logs ${deployedId}`);
+      console.log(`Stop deployment: carrier stop ${deployedId}`);
       process.exit(0);
     };
 
@@ -222,8 +237,5 @@ Continue from where the previous tasks left off.`;
       tail: 50,
       format: 'pretty'
     });
-
-  } else {
-    console.error(`\n❌ Failed to resume deployment: ${taskResult.message}`);
   }
 }

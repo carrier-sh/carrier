@@ -36,14 +36,14 @@ export const COMMANDS: Record<string, Command> = {
 
   deploy: {
     name: 'deploy',
-    aliases: ['d'],
+    aliases: ['d', 'run'],
     description: 'Deploy a fleet with a request',
-    usage: 'carrier deploy <fleet-id> "<request>" [--detach] [--watch]',
+    usage: 'carrier deploy <fleet-id> "<request>" [--detach]',
     examples: [
-      'carrier deploy code-change "Add dark mode to settings"',
-      'carrier deploy code-change "Add dark mode" --detach  # Run in background',
-      'carrier deploy code-change "Add dark mode" --watch   # Deploy with live monitoring',
-      'carrier deploy test-suite "Write tests for auth module"'
+      'carrier deploy code "Add dark mode to settings"',
+      'carrier deploy code "Add dark mode" --detach  # Run in background',
+      'carrier deploy code "Fix auth bug"',
+      'carrier run code "Write tests"  # Same as deploy (alias)'
     ],
     category: 'core',
     requiresInit: true
@@ -161,18 +161,6 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: false
   },
 
-  fleet: {
-    name: 'fleet',
-    aliases: ['f'],
-    description: 'Get fleet configuration',
-    usage: 'carrier fleet <fleet-id> [--json]',
-    examples: [
-      'carrier fleet code-change',
-      'carrier fleet code-change --json'
-    ],
-    category: 'fleet',
-    requiresInit: true
-  },
 
 
 
@@ -209,14 +197,13 @@ export const COMMANDS: Record<string, Command> = {
 
   'logs': {
     name: 'logs',
-    aliases: ['l'],
-    description: 'View and tail fleet execution logs',
-    usage: 'carrier logs <deployment-id> [-f] [--tail=<n>] [--streams]',
+    aliases: ['l', 'log'],
+    description: 'View deployment logs',
+    usage: 'carrier logs <deployment-id> [-f] [--tail=<n>]',
     examples: [
-      'carrier logs abc123              # Show all logs',
-      'carrier logs abc123 -f           # Follow logs in real-time',
-      'carrier logs abc123 --tail=50    # Show last 50 lines',
-      'carrier logs abc123 --streams    # Show detailed stream events'
+      'carrier logs 123              # Show last 100 lines',
+      'carrier logs 123 -f           # Follow logs in real-time',
+      'carrier logs 123 --tail=50    # Show last 50 lines'
     ],
     category: 'core',
     requiresInit: true

@@ -182,21 +182,12 @@ export class CLICommands {
   }
 
 
-  async fleet(params: string[]): Promise<void> {
-    return commands.fleet(this.carrier, params);
-  }
-
-
   async clean(params: string[]): Promise<void> {
     return commands.clean(this.carrier, params);
   }
 
   async config(params: string[]): Promise<void> {
     return commands.config(this.configManager, this.carrierPath, params);
-  }
-
-  async watchLogs(params: string[]): Promise<void> {
-    return commands.watchLogs(this.carrier, params, this.carrierPath);
   }
 
   async watch(params: string[]): Promise<void> {
