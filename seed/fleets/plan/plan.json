@@ -10,7 +10,7 @@
       "description": "Research repository to identify critical context for planning",
       "agent": "plan-researcher",
       "inputs": [{"type": "user_prompt", "source": "request"}],
-      "outputs": [{"type": "file", "path": "research.md"}],
+      "outputs": [{"type": "file", "path": "plan-researcher.md"}],
       "approval_required": false,
       "nextTasks": [
         {
@@ -27,7 +27,7 @@
         {"type": "output", "source": "plan-researcher"},
         {"type": "user_prompt", "source": "request"}
       ],
-      "outputs": [{"type": "file", "path": "plan.md"}],
+      "outputs": [{"type": "file", "path": "plan-executor.md"}],
       "approval_required": false,
       "nextTasks": [
         {
