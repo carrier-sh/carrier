@@ -7,16 +7,20 @@ Quick reference for navigating the Carrier codebase. This guide tells you WHERE 
 ### Core System Files
 - **Main entry point**: `src/cli.ts`
 - **Core orchestration logic**: `src/core.ts` (CarrierCore class)
-- **Command implementations**: `src/cli-commands.ts`
-- **Command registry**: `src/command-registry.ts`
-- **Argument parsing**: `src/cli-parser.ts`
-- **Claude Code integration**: `src/carrier-dispatch.ts`
+- **Command implementations**: `src/commands.ts` (CLICommands class)
+- **Individual commands**: `src/commands/*.ts`
+- **Command registry**: `src/registry.ts`
+- **Argument parsing**: `src/parser.ts`
+- **Task orchestration**: `src/executor.ts` (TaskExecutor class)
+- **Provider management**: `src/dispatcher.ts` (TaskDispatcher class)
+- **Background processes**: `src/detached.ts` (DetachedExecutor class)
 - **Package configuration**: `package.json`
 - **TypeScript config**: `tsconfig.json`
 
 ### Type Definitions & Interfaces
 - **All interfaces** (Agent, Fleet, Task, DeployedFleet): `src/core.ts`
-- **CLI types**: `src/cli-parser.ts`
+- **CLI types**: `src/parser.ts`
+- **Provider types**: `src/types/index.ts`
 
 ### Configuration & State
 - **Runtime config**: `.carrier/config.json`
@@ -49,8 +53,8 @@ Quick reference for navigating the Carrier codebase. This guide tells you WHERE 
 ## Navigation Patterns
 
 ### Finding Command Logic
-1. Check command name in `src/command-registry.ts`
-2. Find implementation in `src/cli-commands.ts`
+1. Check command name in `src/registry.ts`
+2. Find implementation in `src/commands.ts` or `src/commands/{command}.ts`
 3. Look for core logic in `src/core.ts`
 
 ### Finding Fleet Configuration
@@ -83,7 +87,8 @@ Quick reference for navigating the Carrier codebase. This guide tells you WHERE 
 Search for `process.env` in:
 - `src/cli.ts`
 - `src/core.ts`
-- `src/cli-commands.ts`
+- `src/commands.ts`
+- `src/executor.ts`
 
 ## Debug Information
 Check these files for debug patterns:

@@ -6,7 +6,7 @@
 Central source of truth for all commands.
 
 ```
-src/command-registry.ts
+src/registry.ts
 - COMMANDS object
 - getCommand()
 - generateHelp()
@@ -14,20 +14,30 @@ src/command-registry.ts
 ```
 
 ### CLI
-Routes commands to handlers.
+Main entry point and command router.
 
 ```
-src/cli.ts → src/cli-commands.ts
+src/cli.ts → src/commands.ts → src/commands/*.ts
 ```
 
-### Dispatcher
-Ultra-fast command router for Claude Code.
+### Task Execution System
+Manages task orchestration and execution.
 
 ```
-src/carrier-dispatch.ts
-- Parses input
-- Routes to carrier
-- Auto-deploys plain text
+src/executor.ts (TaskExecutor)
+- Orchestrates task execution
+- Manages task transitions
+- Handles detached execution
+
+src/dispatcher.ts (TaskDispatcher)
+- Manages AI providers
+- Routes tasks to providers
+- Handles provider configuration
+
+src/detached.ts (DetachedExecutor)
+- Spawns background processes
+- Manages PID tracking
+- Handles process termination
 ```
 
 ## Directory Structure

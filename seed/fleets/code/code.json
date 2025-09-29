@@ -90,7 +90,7 @@
       "nextTasks": [
         {
           "taskId": "complete",
-          "condition": "all_pass"
+          "condition": "success"
         },
         {
           "taskId": "code-executor",

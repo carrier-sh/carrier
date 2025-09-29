@@ -4,9 +4,9 @@
 
 ```bash
 bun test                    # All tests
-bun test command-registry   # Registry tests
-bun test carrier-dispatch   # Dispatcher tests
-bun test cli-commands       # CLI tests
+bun test registry           # Registry tests
+bun test commands           # CLI commands tests
+bun test executor           # Task executor tests
 bun test integration        # Integration tests
 ```
 
@@ -14,9 +14,10 @@ bun test integration        # Integration tests
 
 ```
 src/__tests__/
-├── command-registry.test.ts  # Registry logic
-├── carrier-dispatch.test.ts  # Dispatcher routing
-├── cli-commands.test.ts      # CLI commands
+├── registry.test.ts          # Registry logic
+├── commands.test.ts          # CLI commands
+├── executor.test.ts          # Task executor
+├── dispatcher.test.ts        # Provider dispatcher
 └── integration/
     └── claude-code.test.ts   # Claude integration
 ```
@@ -24,9 +25,10 @@ src/__tests__/
 ## Coverage Areas
 
 - Command registry (aliases, help, suggestions)
-- Dispatcher (routing, auto-deploy)
-- CLI commands (init, config, deploy)
-- Claude Code setup (files, structure)
+- Task execution (orchestration, transitions)
+- Provider management (Claude integration)
+- CLI commands (init, config, deploy, stop, resume)
+- Background process management
 
 ## Key Tests
 
