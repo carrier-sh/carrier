@@ -61,7 +61,7 @@ export const COMMANDS: Record<string, Command> = {
   
   status: {
     name: 'status',
-    aliases: ['s'],
+    aliases: ['st'],
     description: 'Check status of deployments with enhanced details',
     usage: 'carrier status [deployment-id] [--all] [--streams]',
     examples: [
@@ -211,12 +211,12 @@ export const COMMANDS: Record<string, Command> = {
 
   'stop': {
     name: 'stop',
-    aliases: ['cancel'],
+    aliases: ['s', 'cancel'],
     description: 'Stop/cancel a running deployment',
-    usage: 'carrier stop <deployment-id> [--force]',
+    usage: 'carrier stop <deployment-id>',
     examples: [
-      'carrier stop 5                   # Stop deployment 5 with confirmation',
-      'carrier stop 5 --force           # Force stop without confirmation',
+      'carrier stop 5                   # Stop deployment 5',
+      'carrier s 5                      # Same as stop (alias)',
       'carrier stop --all               # Stop all active deployments',
       'carrier cancel 5                 # Same as stop (alias)'
     ],
