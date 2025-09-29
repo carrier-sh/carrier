@@ -30,7 +30,7 @@ export class TaskDispatcher {
       carrierPath: this.options.carrierPath,
       isGlobal: this.options.isGlobal,
       permissionMode: 'acceptEdits',
-      model: 'claude-3-5-sonnet-20241022',
+      // model: undefined,  // Let SDK use default model
       cwd: process.cwd(),
       ...this.options.providerOptions?.claude
     };
