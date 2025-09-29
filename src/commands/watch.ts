@@ -3,7 +3,7 @@
  * Similar to `docker logs -f`, allows watching agent activities live
  */
 
-import { StreamManager } from '../stream-manager.js';
+import { StreamManager } from '../stream.js';
 import { CarrierCore } from '../core.js';
 
 export async function watch(

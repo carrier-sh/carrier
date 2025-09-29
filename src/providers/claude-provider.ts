@@ -29,10 +29,10 @@ export class ClaudeProvider implements AIProvider {
   readonly displayName = 'Claude AI';
   readonly version = '1.0.0';
 
-  private options: ClaudeProviderOptions;
-  private logStream: WriteStream | null = null;
-  private logEntries: LogEntry[] = [];
-  private currentLogPath: string | null = null;
+  protected options: ClaudeProviderOptions;
+  protected logStream: WriteStream | null = null;
+  protected logEntries: LogEntry[] = [];
+  protected currentLogPath: string | null = null;
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.options = {
@@ -211,7 +211,7 @@ export class ClaudeProvider implements AIProvider {
     }
   }
 
-  private getAgentConfig(config: TaskConfig): { maxTurns?: number } {
+  protected getAgentConfig(config: TaskConfig): { maxTurns?: number } {
     const carrierPath = this.options.carrierPath || '.carrier';
     const agentConfig: { maxTurns?: number } = {};
 
@@ -269,7 +269,7 @@ export class ClaudeProvider implements AIProvider {
     return frontmatter;
   }
 
-  private buildAgentPrompt(config: TaskConfig): string {
+  protected buildAgentPrompt(config: TaskConfig): string {
     const carrierPath = this.options.carrierPath || '.carrier';
     const outputPath = path.join(carrierPath, 'deployed', config.deployedId, 'outputs', `${config.taskId}.md`);
 
@@ -360,7 +360,7 @@ Remember: You are an autonomous agent. Execute the user's request fully and comp
 Begin task execution now.`;
   }
 
-  private createOutputPath(config: TaskConfig): string {
+  protected createOutputPath(config: TaskConfig): string {
     const carrierPath = this.options.carrierPath || '.carrier';
     const outputDir = path.join(carrierPath, 'deployed', config.deployedId, 'outputs');
 
@@ -372,7 +372,7 @@ Begin task execution now.`;
     return path.join(outputDir, `${config.taskId}.md`);
   }
 
-  private initializeLogging(config: TaskConfig): string {
+  protected initializeLogging(config: TaskConfig): string {
     const carrierPath = this.options.carrierPath || '.carrier';
     const logDir = path.join(carrierPath, 'deployed', config.deployedId, 'logs');
 
@@ -628,7 +628,7 @@ Begin task execution now.`;
     return { content, turnCount, toolUseCount };
   }
 
-  private extractTextContent(content: any): string {
+  protected extractTextContent(content: any): string {
     if (typeof content === 'string') {
       return content;
     }
@@ -821,7 +821,7 @@ Begin task execution now.`;
     }
   }
 
-  private async saveTaskOutput(
+  protected async saveTaskOutput(
     outputPath: string,
     config: TaskConfig,
     content: string

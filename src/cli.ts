@@ -9,9 +9,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from './core.js';
-import { CLICommands } from './cli-commands.js';
-import { getCommand, suggestDefaultCommand } from './command-registry.js';
-import { CLIParser, COMMAND_FLAGS } from './cli-parser.js';
+import { CLICommands } from './commands.js';
+import { getCommand, suggestDefaultCommand } from './registry.js';
+import { CLIParser, COMMAND_FLAGS } from './parser.js';
 
 /**
  * Find the project root by looking for package.json

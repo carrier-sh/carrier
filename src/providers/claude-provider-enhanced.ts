@@ -4,7 +4,7 @@
  */
 
 import { ClaudeProvider } from './claude-provider.js';
-import { StreamManager } from '../stream-manager.js';
+import { StreamManager } from '../stream.js';
 import { TaskConfig, TaskResult } from '../types/providers.js';
 import { query, type SDKMessage, type PermissionMode } from '@anthropic-ai/claude-code';
 import * as path from 'path';
@@ -91,20 +91,20 @@ export class EnhancedClaudeProvider extends ClaudeProvider {
 
       // Process messages with enhanced streaming
       for await (const message of conversation) {
-        const messageType = message.type;
+        const messageType = message.type as string;
 
         // Stream different message types
         switch (messageType) {
           case 'assistant':
             await this.handleAssistantMessage(message, config, outputPath);
-            if (message.message?.content) {
-              outputContent += this.extractTextContent(message.message.content);
+            if ((message as any).message?.content) {
+              outputContent += this.extractTextContent((message as any).message.content);
             }
             break;
 
           case 'stream_event':
             await this.handleEnhancedStreamEvent(
-              message.event,
+              (message as any).event,
               config,
               config.deployedId,
               config.taskId
@@ -112,7 +112,7 @@ export class EnhancedClaudeProvider extends ClaudeProvider {
             break;
 
           case 'partial':
-            await this.handlePartialMessage(message, config);
+            await this.handlePartialMessage(message as any, config);
             break;
 
           case 'result':
@@ -127,8 +127,8 @@ export class EnhancedClaudeProvider extends ClaudeProvider {
             this.streamManager.writeEvent(config.deployedId, config.taskId, {
               type: 'error',
               content: {
-                message: message.error || 'Unknown error occurred',
-                type: message.subtype
+                message: (message as any).error || 'Unknown error occurred',
+                type: (message as any).subtype
               }
             });
             break;

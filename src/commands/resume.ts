@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from '../core.js';
-import { TaskExecutor } from '../task-executor.js';
+import { TaskExecutor } from '../executor.js';
 
 export async function resume(
   carrier: CarrierCore,
@@ -218,7 +218,7 @@ Continue from where the previous tasks left off.`;
     console.log('\nStreaming output (Press Ctrl+C to detach)...');
     console.log('────────────────────────────────────────────────\n');
 
-    const { StreamManager } = await import('../stream-manager.js');
+    const { StreamManager } = await import('../stream.js');
     const streamManager = new StreamManager(carrierPath);
 
     // Set up Ctrl+C handler to detach gracefully

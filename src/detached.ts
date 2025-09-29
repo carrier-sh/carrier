@@ -96,7 +96,7 @@ export class DetachedExecutor {
 
 // Standalone task runner script for Bun
 import { CarrierCore } from '${path.resolve(options.carrierPath, '../src/core.js')}';
-import { TaskExecutor } from '${path.resolve(options.carrierPath, '../src/task-executor.js')}';
+import { TaskExecutor } from '${path.resolve(options.carrierPath, '../src/executor.js')}';
 import path from 'path';
 
 async function runTask() {` :
@@ -104,7 +104,7 @@ async function runTask() {` :
 
 // Standalone task runner script for Node.js
 const { CarrierCore } = require('${path.resolve(options.carrierPath, '../src/core.js')}');
-const { TaskExecutor } = require('${path.resolve(options.carrierPath, '../src/task-executor.js')}');
+const { TaskExecutor } = require('${path.resolve(options.carrierPath, '../src/executor.js')}');
 const path = require('path');
 
 async function runTask() {`;

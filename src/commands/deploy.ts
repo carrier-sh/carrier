@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { CarrierCore } from '../core.js';
-import { TaskExecutor } from '../task-executor.js';
-import { StreamManager } from '../stream-manager.js';
+import { TaskExecutor } from '../executor.js';
+import { StreamManager } from '../stream.js';
 
 export async function deploy(
   carrier: CarrierCore,
@@ -52,37 +52,31 @@ export async function deploy(
       if (firstTask && firstTask.agent) {
         const taskExecutor = new TaskExecutor(carrier, carrierPath);
 
-        if (isDetached) {
-          // Detached mode: Start task in background and return immediately
-          const detachResult = taskExecutor.executeDetached({
-            deployedId: result.data.id,
-            taskId: firstTask.id,
-            agentType: firstTask.agent,
-            prompt: request
-          });
+        // Always use detached execution for both modes
+        // This ensures the task runs independently of the CLI process
+        const detachResult = taskExecutor.executeDetached({
+          deployedId: result.data.id,
+          taskId: firstTask.id,
+          agentType: firstTask.agent,
+          prompt: request
+        });
 
-          if (detachResult.success) {
-            console.log(`✨ Running in detached mode`);
-            console.log(`\nDeployment ID: ${result.data.id}`);
-            console.log(`Watch output: carrier watch ${result.data.id}`);
-            console.log(`View logs: carrier logs ${result.data.id}`);
-            console.log(`Check status: carrier status ${result.data.id}`);
-            console.log(`Stop deployment: carrier stop ${result.data.id}`);
-          } else {
-            console.error(`Failed to start detached task: ${detachResult.message}`);
-          }
+        if (!detachResult.success) {
+          console.error(`Failed to start task: ${detachResult.message}`);
+          return;
+        }
+
+        if (isDetached) {
+          // Explicit detached mode: Start task in background and return immediately
+          console.log(`✨ Running in detached mode`);
+          console.log(`\nDeployment ID: ${result.data.id}`);
+          console.log(`Watch output: carrier watch ${result.data.id}`);
+          console.log(`View logs: carrier logs ${result.data.id}`);
+          console.log(`Check status: carrier status ${result.data.id}`);
+          console.log(`Stop deployment: carrier stop ${result.data.id}`);
           return;
         } else {
-          // Normal mode: Start task execution (non-blocking but we'll attach to it)
-          taskExecutor.executeTask({
-            deployedId: result.data.id,
-            taskId: firstTask.id,
-            agentType: firstTask.agent,
-            prompt: request,
-            background: true,
-            interactive: false
-          });
-          // Default: Attach to output stream
+          // Normal mode: Start task in background but immediately attach to watch
           // Give process a moment to start
           await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -91,21 +85,22 @@ export async function deploy(
 
           const streamManager = new StreamManager(carrierPath);
 
-          // Set up Ctrl+C handler to detach gracefully
+          // Set up Ctrl+C handler to detach gracefully (only stops watching, not the task)
           const detachHandler = () => {
+            streamManager.stopWatch(result.data?.id || '');
             console.log('\n\n✅ Detached from deployment');
-            console.log(`Deployment ${result.data.id} continues running in background`);
-            console.log(`\nWatch output: carrier watch ${result.data.id}`);
-            console.log(`Check status: carrier status ${result.data.id}`);
-            console.log(`View logs: carrier logs ${result.data.id}`);
-            console.log(`Stop deployment: carrier stop ${result.data.id}`);
+            console.log(`Deployment ${result.data?.id} continues running in background`);
+            console.log(`\nWatch output: carrier watch ${result.data?.id}`);
+            console.log(`Check status: carrier status ${result.data?.id}`);
+            console.log(`View logs: carrier logs ${result.data?.id}`);
+            console.log(`Stop deployment: carrier stop ${result.data?.id}`);
             process.exit(0);
           };
 
           process.on('SIGINT', detachHandler);
 
           // Watch the deployment
-          await streamManager.watchStream(result.data.id, {
+          await streamManager.watchStream(result.data?.id || '', {
             follow: true,
             tail: 20,
             format: 'pretty'

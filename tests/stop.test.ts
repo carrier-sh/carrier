@@ -9,7 +9,7 @@ import { join } from 'path';
 import { spawn } from 'child_process';
 import { cleanTestDir, runCarrier, TEST_DIR } from './setup';
 import { shouldStop } from '../src/commands/stop';
-import { DetachedExecutor } from '../src/detached-executor';
+import { DetachedExecutor } from '../src/detached';
 
 describe('stop command', () => {
   beforeEach(() => {

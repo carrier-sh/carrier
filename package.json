@@ -9,7 +9,7 @@
     "carrier": "dist/cli.js"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target bun --format esm && bun build src/carrier-dispatch.ts --outdir dist --target bun --format esm",
+    "build": "bun build src/cli.ts --outdir dist --target bun --format esm && bun build src/dispatch.ts --outdir dist --target bun --format esm",
     "dev": "bun src/cli.ts",
     "carrier": "bun src/cli.ts",
     "lint": "tsc --noEmit",

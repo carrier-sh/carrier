@@ -7,10 +7,10 @@ import path from 'path';
 import fs from 'fs';
 import { CarrierCore } from './core.js';
 import { AuthManager } from './auth.js';
-import { RemoteFleetManager } from './remote-fleet-manager.js';
-import { ConfigManager } from './config-manager.js';
-import { TaskExecutor } from './task-executor.js';
-import { generateHelp } from './command-registry.js';
+import { RemoteFleetManager } from './remote.js';
+import { ConfigManager } from './config.js';
+import { TaskExecutor } from './executor.js';
+import { generateHelp } from './registry.js';
 import { Fleet } from './types/index.js';
 
 // Import all command functions

@@ -4,9 +4,9 @@
  */
 
 import { CarrierCore } from './core.js';
-import { TaskDispatcher, TaskDispatcherOptions } from './task-dispatcher.js';
+import { TaskDispatcher, TaskDispatcherOptions } from './dispatcher.js';
 import { TaskConfig, TaskResult } from './types/index.js';
-import { DetachedExecutor } from './detached-executor.js';
+import { DetachedExecutor } from './detached.js';
 
 export interface TaskExecutionOptions {
   deployedId: string;

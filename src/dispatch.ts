@@ -6,7 +6,7 @@
  */
 
 import { spawn } from 'child_process';
-import { getCommand, suggestDefaultCommand, COMMANDS } from './command-registry.js';
+import { getCommand, suggestDefaultCommand, COMMANDS } from './registry.js';
 
 // Get input from command line
 const input = process.argv.slice(2).join(' ').trim();

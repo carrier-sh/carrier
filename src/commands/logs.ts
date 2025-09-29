@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { CarrierCore } from '../core.js';
-import { StreamManager } from '../stream-manager.js';
+import { StreamManager } from '../stream.js';
 
 export async function logs(
   carrier: CarrierCore,

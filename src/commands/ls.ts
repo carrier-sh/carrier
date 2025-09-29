@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { CarrierCore } from '../core.js';
-import { RemoteFleetManager } from '../remote-fleet-manager.js';
+import { RemoteFleetManager } from '../remote.js';
 
 export async function ls(
   carrier: CarrierCore,

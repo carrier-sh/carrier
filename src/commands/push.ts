@@ -4,7 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { RemoteFleetManager } from '../remote-fleet-manager.js';
+import { RemoteFleetManager } from '../remote.js';
 
 function copyDirectoryRecursive(source: string, target: string): void {
   // Create target directory
