@@ -36,12 +36,14 @@ export const COMMANDS: Record<string, Command> = {
 
   deploy: {
     name: 'deploy',
-    aliases: ['d'],
+    aliases: ['d', 'run'],
     description: 'Deploy a fleet with a request',
-    usage: 'carrier deploy <fleet-id> "<request>"',
+    usage: 'carrier deploy <fleet-id> "<request>" [--detach]',
     examples: [
-      'carrier deploy code-change "Add dark mode to settings"',
-      'carrier deploy test-suite "Write tests for auth module"'
+      'carrier deploy code "Add dark mode to settings"',
+      'carrier deploy code "Add dark mode" --detach  # Run in background',
+      'carrier deploy code "Fix auth bug"',
+      'carrier run code "Write tests"  # Same as deploy (alias)'
     ],
     category: 'core',
     requiresInit: true
@@ -59,10 +61,15 @@ export const COMMANDS: Record<string, Command> = {
   
   status: {
     name: 'status',
-    aliases: ['s'],
-    description: 'Check status of deployments',
-    usage: 'carrier status [deployment-id]',
-    examples: ['carrier status', 'carrier status fleet-xyz789'],
+    aliases: ['st'],
+    description: 'Check status of deployments with enhanced details',
+    usage: 'carrier status [deployment-id] [--all] [--streams]',
+    examples: [
+      'carrier status                    # Show active deployments',
+      'carrier status fleet-xyz789       # Show specific deployment',
+      'carrier status --all              # Show all deployments',
+      'carrier status fleet-xyz789 --streams  # Include stream statistics'
+    ],
     category: 'core',
     requiresInit: true
   },
@@ -154,116 +161,8 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: false
   },
 
-  // State management commands for fleet orchestration
-  'save-output': {
-    name: 'save-output',
-    description: 'Save task output for a deployment',
-    usage: 'carrier save-output <deployed-id> <task-id> --content "<content>"',
-    examples: [
-      'carrier save-output fleet-abc123 task1 --content "Task output here"'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
 
-  'update-task': {
-    name: 'update-task',
-    description: 'Update task status in a deployment',
-    usage: 'carrier update-task <deployed-id> <task-id> --status <status>',
-    examples: [
-      'carrier update-task fleet-abc123 task1 --status complete',
-      'carrier update-task fleet-abc123 task2 --status failed'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
 
-  'update-fleet': {
-    name: 'update-fleet',
-    description: 'Update fleet deployment status',
-    usage: 'carrier update-fleet <deployed-id> --status <status> [--current-task <task>]',
-    examples: [
-      'carrier update-fleet fleet-abc123 --status awaiting_approval',
-      'carrier update-fleet fleet-abc123 --status active --current-task task2'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'get-output': {
-    name: 'get-output',
-    description: 'Get task output from a deployment',
-    usage: 'carrier get-output <deployed-id> <task-id>',
-    examples: [
-      'carrier get-output fleet-abc123 task1'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  fleet: {
-    name: 'fleet',
-    aliases: ['f'],
-    description: 'Get fleet configuration',
-    usage: 'carrier fleet <fleet-id> [--json]',
-    examples: [
-      'carrier fleet code-change',
-      'carrier fleet code-change --json'
-    ],
-    category: 'fleet',
-    requiresInit: true
-  },
-
-  'get-context': {
-    name: 'get-context',
-    description: 'Get deployment context for task execution',
-    usage: 'carrier get-context <deployed-id> <task-id>',
-    examples: [
-      'carrier get-context fleet-abc123 task1'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  execute: {
-    name: 'execute',
-    aliases: ['exec', 'e'],
-    description: 'Continue executing a deployment from its current task',
-    usage: 'carrier execute <deployed-id> [--timeout <seconds>] [--background]',
-    examples: [
-      'carrier execute 1',
-      'carrier exec 2 --timeout 300',
-      'carrier e 3 --background'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'execute-task': {
-    name: 'execute-task',
-    description: 'Execute a specific task - launches interactive Claude Code session (default) or runs in background',
-    usage: 'carrier execute-task <deployed-id> <task-id> --agent-type <type> --prompt "<prompt>" [--timeout <seconds>] [--background]',
-    examples: [
-      'carrier execute-task fleet-abc123 task1 --agent-type requirement-analyzer --prompt "Analyze requirements"',
-      'carrier execute-task fleet-abc123 task2 --agent-type code-executor --prompt "Execute tests" --timeout 300',
-      'carrier execute-task fleet-abc123 task3 --agent-type test-creator --prompt "Create test suite" --background'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-
-  'task-status': {
-    name: 'task-status',
-    description: 'Get the status of a running or completed task',
-    usage: 'carrier task-status <deployed-id> <task-id> [--json]',
-    examples: [
-      'carrier task-status fleet-abc123 task1',
-      'carrier task-status fleet-abc123 task2 --json'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-  
 
 
   clean: {
@@ -276,6 +175,65 @@ export const COMMANDS: Record<string, Command> = {
       'carrier clean fleet-abc123        # Clean specific deployment',
       'carrier clean fleet-abc123 --keep-outputs  # Clean but keep outputs',
       'carrier clean --force             # Clean all completed fleets without confirmation'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'watch': {
+    name: 'watch',
+    aliases: ['w'],
+    description: 'Watch fleet execution in real-time with detailed agent activity',
+    usage: 'carrier watch <deployment-id> [--no-follow] [--tail=<n>] [--filter=<pattern>]',
+    examples: [
+      'carrier watch abc123              # Watch deployment live',
+      'carrier watch abc123 --tail=50    # Show last 50 events and follow',
+      'carrier watch abc123 --no-follow  # Show logs and exit',
+      'carrier watch abc123 --filter="tool_use"  # Only show tool usage'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'logs': {
+    name: 'logs',
+    aliases: ['l', 'log'],
+    description: 'View deployment logs',
+    usage: 'carrier logs <deployment-id> [-f] [--tail=<n>]',
+    examples: [
+      'carrier logs 123              # Show last 100 lines',
+      'carrier logs 123 -f           # Follow logs in real-time',
+      'carrier logs 123 --tail=50    # Show last 50 lines'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'stop': {
+    name: 'stop',
+    aliases: ['s', 'cancel'],
+    description: 'Stop/cancel a running deployment',
+    usage: 'carrier stop <deployment-id>',
+    examples: [
+      'carrier stop 5                   # Stop deployment 5',
+      'carrier s 5                      # Same as stop (alias)',
+      'carrier stop --all               # Stop all active deployments',
+      'carrier cancel 5                 # Same as stop (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'resume': {
+    name: 'resume',
+    aliases: ['continue'],
+    description: 'Resume a stopped/cancelled deployment with context',
+    usage: 'carrier resume <deployment-id> [--force] [--from-start]',
+    examples: [
+      'carrier resume 5                 # Resume deployment 5 from where it stopped',
+      'carrier resume 5 --force         # Resume without confirmation',
+      'carrier resume 5 --from-start    # Restart from the beginning',
+      'carrier continue 5               # Same as resume (alias)'
     ],
     category: 'core',
     requiresInit: true

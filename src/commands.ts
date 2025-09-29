@@ -7,9 +7,10 @@ import path from 'path';
 import fs from 'fs';
 import { CarrierCore } from './core.js';
 import { AuthManager } from './auth.js';
-import { RemoteFleetManager } from './remote-fleet-manager.js';
-import { ConfigManager } from './config-manager.js';
-import { generateHelp } from './command-registry.js';
+import { RemoteFleetManager } from './remote.js';
+import { ConfigManager } from './config.js';
+import { TaskExecutor } from './executor.js';
+import { generateHelp } from './registry.js';
 import { Fleet } from './types/index.js';
 
 // Import all command functions
@@ -30,6 +31,7 @@ export class CLICommands {
   private authManager: AuthManager;
   private remoteFleetManager: RemoteFleetManager;
   private configManager: ConfigManager;
+  private taskExecutor: TaskExecutor;
 
   constructor(options: CLIOptions = {}) {
     this.isGlobal = options.isGlobal || false;
@@ -49,6 +51,20 @@ export class CLICommands {
     this.authManager = new AuthManager(this.carrierPath);
     this.remoteFleetManager = new RemoteFleetManager(this.carrierPath, this.authManager);
     this.configManager = new ConfigManager(this.carrierPath);
+
+    // Initialize task executor with provider system
+    this.taskExecutor = new TaskExecutor(this.carrier, this.carrierPath, {
+      isGlobal: this.isGlobal,
+      providerOptions: {
+        claude: {
+          carrierPath: this.carrierPath,
+          isGlobal: this.isGlobal,
+          permissionMode: 'acceptEdits',
+          // model: undefined,  // Let SDK use default model
+          cwd: process.cwd()
+        }
+      }
+    });
   }
 
   async init(params: string[]): Promise<void> {
@@ -79,7 +95,7 @@ export class CLICommands {
     }
 
     // Create subdirectories
-    const dirs = ['fleets', 'deployed', 'testing'];
+    const dirs = ['fleets', 'deployed'];
     dirs.forEach(dir => {
       const dirPath = path.join(this.carrierPath, dir);
       if (!fs.existsSync(dirPath)) {
@@ -165,41 +181,6 @@ export class CLICommands {
     return commands.uninstall(this.carrierPath, this.isGlobal, params);
   }
 
-  async saveOutput(params: string[]): Promise<void> {
-    return commands.saveOutput(this.carrier, params);
-  }
-
-  async updateTask(params: string[]): Promise<void> {
-    return commands.updateTask(this.carrier, params);
-  }
-
-  async updateFleet(params: string[]): Promise<void> {
-    return commands.updateFleet(this.carrier, params);
-  }
-
-  async getOutput(params: string[]): Promise<void> {
-    return commands.getOutput(this.carrier, params);
-  }
-
-  async fleet(params: string[]): Promise<void> {
-    return commands.fleet(this.carrier, params);
-  }
-
-  async getContext(params: string[]): Promise<void> {
-    return commands.getContext(this.carrier, params);
-  }
-
-  async execute(params: string[]): Promise<void> {
-    return commands.execute(this.carrier, params);
-  }
-
-  async executeTask(params: string[]): Promise<void> {
-    return commands.executeTask(this.carrier, params);
-  }
-
-  async taskStatus(params: string[]): Promise<void> {
-    return commands.taskStatus(this.carrierPath, params);
-  }
 
   async clean(params: string[]): Promise<void> {
     return commands.clean(this.carrier, params);
@@ -207,6 +188,22 @@ export class CLICommands {
 
   async config(params: string[]): Promise<void> {
     return commands.config(this.configManager, this.carrierPath, params);
+  }
+
+  async watch(params: string[]): Promise<void> {
+    return commands.watch(this.carrier, this.carrierPath, params);
+  }
+
+  async logs(params: string[]): Promise<void> {
+    return commands.logs(this.carrier, this.carrierPath, params);
+  }
+
+  async stop(params: string[]): Promise<void> {
+    return commands.stop(this.carrier, this.carrierPath, params);
+  }
+
+  async resume(params: string[]): Promise<void> {
+    return commands.resume(this.carrier, this.carrierPath, params);
   }
 
   // Helper methods that are still needed by init and other commands

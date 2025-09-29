@@ -4,8 +4,8 @@
  */
 
 // Base status types used across the system
-export type FleetStatus = 'pending' | 'active' | 'awaiting_approval' | 'complete' | 'failed';
-export type TaskStatus = 'pending' | 'active' | 'awaiting_approval' | 'complete' | 'failed';
+export type FleetStatus = 'pending' | 'active' | 'awaiting_approval' | 'complete' | 'failed' | 'cancelled';
+export type TaskStatus = 'pending' | 'active' | 'awaiting_approval' | 'complete' | 'failed' | 'cancelled';
 
 // Generic result wrapper for operations
 export interface Result<T = any> {

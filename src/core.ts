@@ -148,8 +148,8 @@ export class CarrierCore {
       tasks: deployedTasks
     };
 
-    // Create deployed directory with new structure (use unique ID for folder)
-    const deployedPath = join(this.carrierPath, 'deployed', uniqueId);
+    // Create deployed directory using numeric ID for folder
+    const deployedPath = join(this.carrierPath, 'deployed', id);
     mkdirSync(deployedPath, { recursive: true });
     mkdirSync(join(deployedPath, 'outputs'), { recursive: true });
 
@@ -174,11 +174,12 @@ export class CarrierCore {
 
   updateDeployedStatus(deployedId: string, status: FleetStatus, currentTask?: string, currentAgent?: string): void {
     const registry = this.loadRegistry();
-    const deployed = this.getDeployedFleet(deployedId);
-    if (!deployed) {
+    const deployedIndex = registry.deployedFleets.findIndex(f => f.id === deployedId || f.uniqueId === deployedId);
+    if (deployedIndex === -1) {
       throw new Error(`Deployed fleet ${deployedId} not found`);
     }
 
+    const deployed = registry.deployedFleets[deployedIndex];
     deployed.status = status;
     if (currentTask) {
       // When updating to a new current task, mark previous tasks as complete
@@ -235,8 +236,8 @@ export class CarrierCore {
 
     this.saveRegistry(registry);
 
-    // Update metadata (use uniqueId for folder path if available)
-    const folderName = deployed.uniqueId || deployedId;
+    // Update metadata (use numeric ID for folder path)
+    const folderName = deployedId;
     const metadataPath = join(this.carrierPath, 'deployed', folderName, 'metadata.json');
     if (existsSync(metadataPath)) {
       writeFileSync(metadataPath, JSON.stringify(deployed, null, 2));
@@ -512,8 +513,8 @@ export class CarrierCore {
 
       this.saveRegistry(registry);
       
-      // Also update the metadata.json file directly (use uniqueId for folder)
-      const folderName = deployed.uniqueId || deployedId;
+      // Also update the metadata.json file directly (use numeric ID for folder)
+      const folderName = deployedId;
       const metadataPath = join(this.carrierPath, 'deployed', folderName, 'metadata.json');
       if (existsSync(metadataPath)) {
         try {
@@ -551,9 +552,8 @@ export class CarrierCore {
   // Update task process information in metadata
   async updateTaskProcessInfo(deployedId: string, taskId: string, pid: number): Promise<Result> {
     try {
-      // Get deployed fleet to find uniqueId
-      const deployed = this.getDeployedFleet(deployedId);
-      const folderName = deployed?.uniqueId || deployedId;
+      // Use numeric ID for folder name
+      const folderName = deployedId;
       const metadataPath = join(this.carrierPath, 'deployed', folderName, 'metadata.json');
       if (!existsSync(metadataPath)) {
         return { success: false, error: `Metadata file not found for deployment ${deployedId}` };

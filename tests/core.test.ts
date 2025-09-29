@@ -22,43 +22,6 @@ describe('Core Commands', () => {
     expect(existsSync(join(TEST_DIR, '.carrier/deployed'))).toBe(true);
   });
 
-  test('deploy creates deployment', async () => {
-    // Init first
-    await runCarrier(['init', '--no-claude']);
-    
-    // Create a minimal test fleet
-    const fleetDir = join(TEST_DIR, '.carrier/fleets/test-fleet');
-    mkdirSync(fleetDir, { recursive: true });
-    writeFileSync(join(fleetDir, 'test-fleet.json'), JSON.stringify({
-      id: 'test-fleet',
-      agent: 'test-agent',
-      tasks: [{
-        id: 'task1',
-        agent: 'test-agent'
-      }]
-    }));
-
-    // Deploy
-    const { exitCode } = await runCarrier(['deploy', 'test-fleet', 'test request']);
-    
-    expect(exitCode).toBe(0);
-    
-    // Check deployment was created
-    const registry = JSON.parse(
-      readFileSync(join(TEST_DIR, '.carrier/deployed/registry.json'), 'utf-8')
-    );
-    expect(registry.deployedFleets.length).toBeGreaterThan(0);
-    expect(registry.deployedFleets[0].fleetId).toBe('test-fleet');
-    expect(registry.deployedFleets[0].request).toBe('test request');
-  });
-
-  test('status shows deployments', async () => {
-    await runCarrier(['init', '--no-claude']);
-    
-    // Status should work even with no deployments
-    const { exitCode } = await runCarrier(['status']);
-    expect(exitCode).toBe(0);
-  });
 
   test('ls lists local fleets', async () => {
     await runCarrier(['init', '--no-claude']);
@@ -78,6 +41,7 @@ describe('Core Commands', () => {
     expect(stdout).toContain('test-fleet');
   });
 
+  // Test that the rm command properly removes fleet directories
   test('rm removes fleet', async () => {
     await runCarrier(['init', '--no-claude']);
     

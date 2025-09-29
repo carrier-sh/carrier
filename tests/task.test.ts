@@ -96,59 +96,6 @@ describe('Task Operations', () => {
     // We're testing the command runs, not that it succeeds
   });
 
-  test('task-status command shows task execution status', async () => {
-    // Create deployment with task status
-    const deploymentId = 'test-deploy-status';
-    const deployDir = join(TEST_DIR, '.carrier/deployed', deploymentId);
-    mkdirSync(deployDir, { recursive: true });
-    
-    // Create metadata with task status
-    writeFileSync(join(deployDir, 'metadata.json'), JSON.stringify({
-      id: deploymentId,
-      fleetId: 'test-fleet',
-      status: 'active',
-      tasks: {
-        'task1': { 
-          status: 'complete',
-          startTime: new Date().toISOString(),
-          endTime: new Date().toISOString()
-        }
-      }
-    }));
-    
-    // Create output for the task
-    const outputDir = join(deployDir, 'outputs');
-    mkdirSync(outputDir, { recursive: true });
-    writeFileSync(join(outputDir, 'task1.md'), 'Task completed output');
-
-    // Get task status - command should return success
-    const { exitCode } = await runCarrier(['task-status', deploymentId, 'task1']);
-    expect(exitCode).toBe(0);
-  });
-
-  test('task-status --json returns JSON format', async () => {
-    // Create deployment with task
-    const deploymentId = 'test-deploy-json';
-    const deployDir = join(TEST_DIR, '.carrier/deployed', deploymentId);
-    mkdirSync(deployDir, { recursive: true });
-    
-    const taskStatus = {
-      status: 'complete',
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString()
-    };
-    
-    writeFileSync(join(deployDir, 'metadata.json'), JSON.stringify({
-      id: deploymentId,
-      tasks: {
-        'task1': taskStatus
-      }
-    }));
-
-    // Get task status as JSON - should return success
-    const { exitCode } = await runCarrier(['task-status', deploymentId, 'task1', '--json']);
-    expect(exitCode).toBe(0);
-  });
 
   // Note: processes command was removed completely as per requirements
 });

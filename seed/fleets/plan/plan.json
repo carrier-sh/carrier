@@ -6,28 +6,46 @@
   "outputs": [{"type": "fleet_result", "path": "result.md"}],
   "tasks": [
     {
-      "id": "requirement-analyzer",
-      "description": "Analyze and plan the code change requirements",
-      "agent": "requirement-analyzer.md",
+      "id": "plan-researcher",
+      "description": "Research repository to identify critical context for planning",
+      "agent": "plan-researcher",
       "inputs": [{"type": "user_prompt", "source": "request"}],
-      "outputs": [{"type": "file", "path": "requirements.md"}],
+      "outputs": [{"type": "file", "path": "plan-researcher.md"}],
       "approval_required": false,
       "nextTasks": [
         {
-          "taskId": "validator",
+          "taskId": "plan-executor",
           "condition": "success"
         }
       ]
     },
     {
-      "id": "validator",
-      "description": "Validate the requirements and plan",
-      "agent": "validator.md",
+      "id": "plan-executor",
+      "description": "Create comprehensive implementation plan based on research",
+      "agent": "plan-executor",
       "inputs": [
-        {"type": "output", "source": "requirement-analyzer"},
+        {"type": "output", "source": "plan-researcher"},
         {"type": "user_prompt", "source": "request"}
       ],
-      "outputs": [{"type": "file", "path": "validation.md"}],
+      "outputs": [{"type": "file", "path": "plan-executor.md"}],
+      "approval_required": false,
+      "nextTasks": [
+        {
+          "taskId": "plan-validator",
+          "condition": "success"
+        }
+      ]
+    },
+    {
+      "id": "plan-validator",
+      "description": "Validate the implementation plan for completeness and feasibility",
+      "agent": "plan-validator",
+      "inputs": [
+        {"type": "output", "source": "plan-researcher"},
+        {"type": "output", "source": "plan-executor"},
+        {"type": "user_prompt", "source": "request"}
+      ],
+      "outputs": [{"type": "file", "path": "plan-validator.md"}],
       "approval_required": false,
       "nextTasks": [
         {
@@ -35,9 +53,9 @@
           "condition": "success"
         },
         {
-          "taskId": "requirement-analyzer",
+          "taskId": "plan-executor",
           "condition": "failed",
-          "context": "validation_failed"
+          "context": "validation_failed_needs_revision"
         }
       ]
     }

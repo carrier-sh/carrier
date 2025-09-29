@@ -2,21 +2,14 @@
  * Provider registry for managing AI providers
  */
 
-import { AIProvider, ProviderRegistry } from './provider-interface.js';
-import { ClaudeProvider } from './claude-provider.js';
+import { AIProvider, ProviderRegistry } from '../types/providers.js';
 
 export class ProviderRegistryManager implements ProviderRegistry {
   providers = new Map<string, AIProvider>();
   defaultProvider = 'claude';
 
   constructor() {
-    this.initializeProviders();
-  }
-
-  private initializeProviders(): void {
-    // Register Claude provider
-    const claudeProvider = new ClaudeProvider();
-    this.providers.set(claudeProvider.name, claudeProvider);
+    // Providers are now registered externally with proper configuration
   }
 
   getProvider(name?: string): AIProvider | null {

@@ -14,12 +14,12 @@ _carrier_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="deploy approve status monitor ls pull rm init config help"
+    local commands="deploy approve status ls pull rm init config help"
     
     # Command-specific options
     local init_opts="--global --no-claude"
     local ls_opts="--remote -r"
-    local help_opts="deploy approve status monitor ls pull rm init config"
+    local help_opts="deploy approve status ls pull rm init config"
     
     case "${prev}" in
         carrier)
@@ -46,7 +46,7 @@ _carrier_completions() {
             fi
             return 0
             ;;
-        approve|status|monitor)
+        approve|status)
             # List deployed fleet IDs
             if [ -f ".carrier/deployed/registry.json" ]; then
                 local fleet_ids=$(grep '"id"' .carrier/deployed/registry.json | cut -d'"' -f4)

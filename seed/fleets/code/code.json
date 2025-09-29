@@ -18,7 +18,7 @@
     {
       "id": "code-analyzer",
       "description": "Analyze codebase and plan implementation",
-      "agent": "code-analyzer.md",
+      "agent": "code-analyzer",
       "inputs": [
         {
           "type": "user_prompt",
@@ -27,7 +27,7 @@
       ],
       "outputs": [
         {
-          "path": "analysis.md",
+          "path": "code-analyzer.md",
           "type": "file"
         }
       ],
@@ -42,11 +42,11 @@
     {
       "id": "code-executor",
       "description": "Execute code changes",
-      "agent": "code-executor.md",
+      "agent": "code-executor",
       "inputs": [
         {
           "type": "file",
-          "source": "analysis.md"
+          "source": "code-analyzer.md"
         },
         {
           "type": "user_prompt",
@@ -55,7 +55,7 @@
       ],
       "outputs": [
         {
-          "path": "implementation.md",
+          "path": "code-executor.md",
           "type": "file"
         }
       ],
@@ -70,20 +70,20 @@
     {
       "id": "quality-verifier",
       "description": "Verify implementation quality",
-      "agent": "quality-verifier.md",
+      "agent": "code-verifier",
       "inputs": [
         {
           "type": "file",
-          "source": "implementation.md"
+          "source": "code-executor.md"
         },
         {
           "type": "file",
-          "source": "analysis.md"
+          "source": "code-analyzer.md"
         }
       ],
       "outputs": [
         {
-          "path": "FINAL.md",
+          "path": "quality-verifier.md",
           "type": "file"
         }
       ],

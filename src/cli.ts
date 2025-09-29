@@ -4,12 +4,14 @@
  * Carrier CLI - Simplified version using CLICommands
  */
 
+// Test comment added for verification
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from './core.js';
-import { CLICommands } from './cli-commands.js';
-import { getCommand, suggestDefaultCommand } from './command-registry.js';
-import { CLIParser, COMMAND_FLAGS } from './cli-parser.js';
+import { CLICommands } from './commands.js';
+import { getCommand, suggestDefaultCommand } from './registry.js';
+import { CLIParser, COMMAND_FLAGS } from './parser.js';
 
 /**
  * Find the project root by looking for package.json
@@ -111,8 +113,6 @@ async function handleCommand() {
       return await cli.logout(allParams);
     case 'deploy':
       return await cli.deploy(allParams);
-    case 'execute':
-      return await cli.execute(allParams);
     case 'approve':
       return await cli.approve(allParams);
     case 'status':
@@ -131,25 +131,20 @@ async function handleCommand() {
       return await cli.config(allParams);
     case 'uninstall':
       return await cli.uninstall(allParams);
-    case 'save-output':
-      return await cli.saveOutput(allParams);
-    case 'update-task':
-      return await cli.updateTask(allParams);
-    case 'update-fleet':
-      return await cli.updateFleet(allParams);
-    case 'get-output':
-      return await cli.getOutput(allParams);
-    case 'fleet':
-      return await cli.fleet(allParams);
-    case 'get-context':
-      return await cli.getContext(allParams);
-    case 'execute-task':
-      return await cli.executeTask(allParams);
-    case 'task-status':
-      return await cli.taskStatus(allParams);
     case 'clean':
     case 'cleanup':
       return await cli.clean(allParams);
+    case 'watch':
+      return await cli.watch(allParams);
+    case 'logs':
+      return await cli.logs(allParams);
+    case 'stop':
+    case 's':
+    case 'cancel':
+      return await cli.stop(allParams);
+    case 'resume':
+    case 'continue':
+      return await cli.resume(allParams);
     case 'help':
       return await cli.help(params);
     default:

@@ -2,7 +2,7 @@
  * Config command implementation
  */
 
-import { ConfigManager } from '../config-manager.js';
+import { ConfigManager } from '../config.js';
 
 export async function config(
   configManager: ConfigManager,
