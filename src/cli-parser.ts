@@ -218,10 +218,6 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'force', description: 'Skip confirmation prompt', shorthand: 'f' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
-  execute: [
-    { name: 'background', description: 'Run task in background mode' },
-    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
-  ],
   'execute-task': [
     { name: 'agent-type', description: 'Type of agent to use for execution' },
     { name: 'prompt', description: 'Prompt to send to the agent' },
@@ -261,6 +257,16 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
   'cancel': [
     { name: 'force', description: 'Force stop without confirmation', shorthand: 'f' },
     { name: 'all', description: 'Stop all active deployments' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'resume': [
+    { name: 'force', description: 'Resume without confirmation', shorthand: 'f' },
+    { name: 'from-start', description: 'Restart from the beginning' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  'continue': [
+    { name: 'force', description: 'Resume without confirmation', shorthand: 'f' },
+    { name: 'from-start', description: 'Restart from the beginning' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
   help: []

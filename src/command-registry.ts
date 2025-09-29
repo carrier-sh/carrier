@@ -175,20 +175,6 @@ export const COMMANDS: Record<string, Command> = {
   },
 
 
-  execute: {
-    name: 'execute',
-    aliases: ['exec', 'e'],
-    description: 'Continue executing a deployment from its current task',
-    usage: 'carrier execute <deployed-id> [--background]',
-    examples: [
-      'carrier execute 1',
-      'carrier exec 2',
-      'carrier e 3 --background'
-    ],
-    category: 'core',
-    requiresInit: true
-  },
-  
 
 
   clean: {
@@ -246,6 +232,21 @@ export const COMMANDS: Record<string, Command> = {
       'carrier stop 5 --force           # Force stop without confirmation',
       'carrier stop --all               # Stop all active deployments',
       'carrier cancel 5                 # Same as stop (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'resume': {
+    name: 'resume',
+    aliases: ['continue'],
+    description: 'Resume a stopped/cancelled deployment with context',
+    usage: 'carrier resume <deployment-id> [--force] [--from-start]',
+    examples: [
+      'carrier resume 5                 # Resume deployment 5 from where it stopped',
+      'carrier resume 5 --force         # Resume without confirmation',
+      'carrier resume 5 --from-start    # Restart from the beginning',
+      'carrier continue 5               # Same as resume (alias)'
     ],
     category: 'core',
     requiresInit: true

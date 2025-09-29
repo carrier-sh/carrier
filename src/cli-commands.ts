@@ -186,9 +186,6 @@ export class CLICommands {
     return commands.fleet(this.carrier, params);
   }
 
-  async execute(params: string[]): Promise<void> {
-    return commands.execute(this.carrier, params, this.carrierPath);
-  }
 
   async clean(params: string[]): Promise<void> {
     return commands.clean(this.carrier, params);
@@ -212,6 +209,10 @@ export class CLICommands {
 
   async stop(params: string[]): Promise<void> {
     return commands.stop(this.carrier, this.carrierPath, params);
+  }
+
+  async resume(params: string[]): Promise<void> {
+    return commands.resume(this.carrier, this.carrierPath, params);
   }
 
   // Helper methods that are still needed by init and other commands

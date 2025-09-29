@@ -113,8 +113,6 @@ async function handleCommand() {
       return await cli.logout(allParams);
     case 'deploy':
       return await cli.deploy(allParams);
-    case 'execute':
-      return await cli.execute(allParams);
     case 'approve':
       return await cli.approve(allParams);
     case 'status':
@@ -147,6 +145,9 @@ async function handleCommand() {
     case 'stop':
     case 'cancel':
       return await cli.stop(allParams);
+    case 'resume':
+    case 'continue':
+      return await cli.resume(allParams);
     case 'help':
       return await cli.help(params);
     default:
