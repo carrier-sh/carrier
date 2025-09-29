@@ -1,8 +1,12 @@
 /**
- * Status command implementation
+ * Enhanced Status command - Quick overview of fleet execution
+ * Shows real-time progress and detailed task information
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { CarrierCore } from '../core.js';
+import { StreamManager } from '../stream-manager.js';
 
 export async function status(
   carrier: CarrierCore,
@@ -10,6 +14,8 @@ export async function status(
 ): Promise<void> {
   const deployedId = params[0];
   const isJsonOutput = params.includes('--json');
+  const showStreams = params.includes('--streams');
+  const showAll = params.includes('--all') || params.includes('-a');
   
   if (!deployedId) {
     // Show all deployments
@@ -112,11 +118,29 @@ export async function status(
         }
       });
       
+      // Show stream statistics if requested
+      if (showStreams) {
+        const carrierPath = (carrier as any).carrierPath || '.carrier';
+        const streamManager = new StreamManager(carrierPath);
+        const streamStats = await streamManager.getStreamStats(deployedId);
+
+        console.log(`\n📡 Stream Activity:`);
+        console.log(`  • Total events: ${streamStats.events}`);
+        if (streamStats.byType && Object.keys(streamStats.byType).length > 0) {
+          console.log(`  • By type:`);
+          for (const [type, count] of Object.entries(streamStats.byType)) {
+            console.log(`    - ${type}: ${count}`);
+          }
+        }
+      }
+
       // Show next steps
       if (deployed.status === 'awaiting_approval') {
         console.log(`\n⚠️  Action Required: Run 'carrier approve ${deployed.id}' to continue`);
       } else if (deployed.status === 'active') {
-        console.log(`\n▶️  Fleet is running. Check status with: carrier status ${deployed.id}`);
+        console.log(`\n▶️  Fleet is running.`);
+        console.log(`   • Watch live: carrier watch ${deployed.id}`);
+        console.log(`   • View logs: carrier logs ${deployed.id}`);
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -38,11 +38,12 @@ export const COMMANDS: Record<string, Command> = {
     name: 'deploy',
     aliases: ['d'],
     description: 'Deploy a fleet with a request',
-    usage: 'carrier deploy <fleet-id> "<request>" [--background]',
+    usage: 'carrier deploy <fleet-id> "<request>" [--detach] [--watch]',
     examples: [
       'carrier deploy code-change "Add dark mode to settings"',
-      'carrier deploy test-suite "Write tests for auth module"',
-      'carrier deploy code-review "Review auth module" --background'
+      'carrier deploy code-change "Add dark mode" --detach  # Run in background',
+      'carrier deploy code-change "Add dark mode" --watch   # Deploy with live monitoring',
+      'carrier deploy test-suite "Write tests for auth module"'
     ],
     category: 'core',
     requiresInit: true
@@ -61,9 +62,14 @@ export const COMMANDS: Record<string, Command> = {
   status: {
     name: 'status',
     aliases: ['s'],
-    description: 'Check status of deployments',
-    usage: 'carrier status [deployment-id]',
-    examples: ['carrier status', 'carrier status fleet-xyz789'],
+    description: 'Check status of deployments with enhanced details',
+    usage: 'carrier status [deployment-id] [--all] [--streams]',
+    examples: [
+      'carrier status                    # Show active deployments',
+      'carrier status fleet-xyz789       # Show specific deployment',
+      'carrier status --all              # Show all deployments',
+      'carrier status fleet-xyz789 --streams  # Include stream statistics'
+    ],
     category: 'core',
     requiresInit: true
   },
@@ -200,15 +206,31 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: true
   },
 
-  'watch-logs': {
-    name: 'watch-logs',
-    aliases: ['logs', 'watch'],
-    description: 'Watch session logs in real-time',
-    usage: 'carrier watch-logs <deployed-id> [task-id] [--list]',
+  'watch': {
+    name: 'watch',
+    aliases: ['w'],
+    description: 'Watch fleet execution in real-time with detailed agent activity',
+    usage: 'carrier watch <deployment-id> [--no-follow] [--tail=<n>] [--filter=<pattern>]',
     examples: [
-      'carrier watch-logs 1 code-analyzer  # Watch specific task logs',
-      'carrier watch-logs 1 --list        # List available logs',
-      'carrier logs 1                     # List logs for deployment'
+      'carrier watch abc123              # Watch deployment live',
+      'carrier watch abc123 --tail=50    # Show last 50 events and follow',
+      'carrier watch abc123 --no-follow  # Show logs and exit',
+      'carrier watch abc123 --filter="tool_use"  # Only show tool usage'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'logs': {
+    name: 'logs',
+    aliases: ['l'],
+    description: 'View and tail fleet execution logs',
+    usage: 'carrier logs <deployment-id> [-f] [--tail=<n>] [--streams]',
+    examples: [
+      'carrier logs abc123              # Show all logs',
+      'carrier logs abc123 -f           # Follow logs in real-time',
+      'carrier logs abc123 --tail=50    # Show last 50 lines',
+      'carrier logs abc123 --streams    # Show detailed stream events'
     ],
     category: 'core',
     requiresInit: true

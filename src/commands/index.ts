@@ -15,3 +15,5 @@ export { uninstall } from './uninstall.js';
 export { fleet } from './fleet.js';
 export { clean } from './clean.js';
 export { watchLogs } from './watch-logs.js';
+export { watch } from './watch.js';
+export { logs } from './logs.js';
