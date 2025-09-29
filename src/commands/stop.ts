@@ -51,8 +51,6 @@ export async function stop(
       activeDeployments.forEach((d: any) => {
         console.log(`  • ${d.id}: ${d.fleetId} - ${d.request.substring(0, 50)}...`);
       });
-      console.log('\nPress Ctrl+C to cancel, or wait 3 seconds to continue...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
     for (const deployment of activeDeployments) {
@@ -85,8 +83,6 @@ export async function stop(
     console.log(`   Fleet: ${deployed.fleetId}`);
     console.log(`   Request: ${deployed.request}`);
     console.log(`   Current task: ${deployed.currentTask}`);
-    console.log('\nPress Ctrl+C to cancel, or wait 3 seconds to continue...');
-    await new Promise(resolve => setTimeout(resolve, 3000));
   }
 
   await stopDeployment(carrier, carrierPath, deployedId, force);

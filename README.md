@@ -1,3 +1,5 @@
+Hi! 👋
+
 # Carrier 🚀
 
 **Fleet Orchestration System for Claude Code**

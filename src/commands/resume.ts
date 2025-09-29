@@ -77,8 +77,6 @@ export async function resume(
       console.log(`   Will continue from: ${deployed.currentTask || 'beginning'}`);
     }
 
-    console.log('\nPress Ctrl+C to cancel, or wait 3 seconds to continue...');
-    await new Promise(resolve => setTimeout(resolve, 3000));
   }
 
   // Remove stop marker if it exists

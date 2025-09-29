@@ -58,29 +58,25 @@ export async function deploy(
       if (firstTask && firstTask.agent) {
         if (isDetached) {
           // Detached mode: Start the task in background and return immediately
-          console.log(`\n🚀 Fleet deployed in detached mode`);
+          console.log(`\n🚀 Starting fleet in detached mode...`);
+
+          // Start task execution in background (non-blocking)
+          const taskExecutor = new TaskExecutor(carrier, carrierPath);
+          taskExecutor.executeTask({
+            deployedId: result.data.id,
+            taskId: firstTask.id,
+            agentType: firstTask.agent,
+            prompt: request,
+            background: true,
+            interactive: false
+          });
+
+          // Show deployment info
+          console.log(`\n✅ Fleet deployed in detached mode`);
           console.log(`📊 Deployment ID: ${result.data.id}`);
           console.log(`\n📡 Monitor with: carrier watch ${result.data.id}`);
           console.log(`📈 Check status: carrier status ${result.data.id}`);
           console.log(`📜 View logs: carrier logs ${result.data.id}`);
-
-          // Create a background execution script
-          const { spawn } = await import('child_process');
-
-          // Use the current process to execute in background
-          const child = spawn(process.argv[0], [
-            process.argv[1],
-            'execute',
-            result.data.id,
-            '--background'
-          ], {
-            detached: true,
-            stdio: 'ignore',
-            env: process.env
-          });
-
-          // Unref the child so parent can exit
-          child.unref();
 
           // Exit immediately
           return;
@@ -93,7 +89,7 @@ export async function deploy(
 
           // Start task execution in background
           const taskExecutor = new TaskExecutor(carrier, carrierPath);
-          const taskPromise = taskExecutor.executeTask({
+          taskExecutor.executeTask({
             deployedId: result.data.id,
             taskId: firstTask.id,
             agentType: firstTask.agent,
@@ -106,8 +102,20 @@ export async function deploy(
           await new Promise(resolve => setTimeout(resolve, 500));
 
           console.log(`\n👀 Watching deployment ${result.data.id}...`);
-          console.log(`   Press Ctrl+C to stop watching`);
+          console.log(`   Press Ctrl+C to detach (task continues in background)`);
           console.log(`────────────────────────────────────────────────\n`);
+
+          // Set up Ctrl+C handler to detach gracefully
+          const detachHandler = () => {
+            console.log('\n\n👋 Detaching from deployment (task continues running)');
+            console.log(`\n📋 Task continues in background`);
+            console.log(`📡 Resume watching: carrier watch ${result.data.id}`);
+            console.log(`📈 Check status: carrier status ${result.data.id}`);
+            console.log(`📜 View logs: carrier logs ${result.data.id}`);
+            process.exit(0);
+          };
+
+          process.on('SIGINT', detachHandler);
 
           // Watch the deployment
           await streamManager.watchStream(result.data.id, {
@@ -115,13 +123,6 @@ export async function deploy(
             tail: 20,
             format: 'pretty'
           });
-
-          // Wait for task to complete
-          const taskResult = await taskPromise;
-          if (!taskResult.success) {
-            console.error(`\n❌ Task execution failed: ${taskResult.message}`);
-            process.exit(1);
-          }
         } else {
           // Normal mode: Run interactively
           console.log(`Starting first task: ${firstTask.id} with agent: ${firstTask.agent}`);
