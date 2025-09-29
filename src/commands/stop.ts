@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from '../core.js';
+import { DetachedExecutor } from '../detached-executor.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -23,11 +24,9 @@ export async function stop(
   if (!deployedId && !all) {
     console.error('Usage: carrier stop <deployment-id> [options]');
     console.error('\nOptions:');
-    console.error('  -f, --force      Force stop without confirmation');
     console.error('  --all            Stop all active deployments');
     console.error('\nExamples:');
     console.error('  carrier stop 5              # Stop deployment 5');
-    console.error('  carrier stop 5 --force      # Force stop without confirmation');
     console.error('  carrier stop --all          # Stop all active deployments');
     return;
   }
@@ -44,14 +43,7 @@ export async function stop(
       return;
     }
 
-    console.log(`Found ${activeDeployments.length} active deployment(s)`);
-
-    if (!force) {
-      console.log('\nThis will stop the following deployments:');
-      activeDeployments.forEach((d: any) => {
-        console.log(`  • ${d.id}: ${d.fleetId} - ${d.request.substring(0, 50)}...`);
-      });
-    }
+    console.log(`Stopping ${activeDeployments.length} active deployment(s)...`);
 
     for (const deployment of activeDeployments) {
       await stopDeployment(carrier, carrierPath, deployment.id, true);
@@ -78,14 +70,8 @@ export async function stop(
     return;
   }
 
-  if (!force) {
-    console.log(`\n⚠️  About to stop deployment ${deployedId}`);
-    console.log(`   Fleet: ${deployed.fleetId}`);
-    console.log(`   Request: ${deployed.request}`);
-    console.log(`   Current task: ${deployed.currentTask}`);
-  }
-
-  await stopDeployment(carrier, carrierPath, deployedId, force);
+  // Just stop it directly - no confirmation needed
+  await stopDeployment(carrier, carrierPath, deployedId, true);
   console.log(`\n✅ Deployment ${deployedId} stopped`);
 }
 
@@ -103,13 +89,30 @@ async function stopDeployment(
   }
 
   try {
-    // Find and kill any running processes for this deployment
-    // Look for processes that might be running this deployment
+    // First, get the deployed fleet info to find current task
+    const deployed = carrier.getDeployedFleet(deployedId);
 
-    // First, try to find processes with the deployment ID in the command
+    if (deployed && deployed.currentTask) {
+      // Try to kill the detached process using PID file
+      const killed = DetachedExecutor.kill(carrierPath, deployedId, deployed.currentTask);
+      if (killed && !silent) {
+        console.log(`  ✓ Stopped task process: ${deployed.currentTask}`);
+      }
+
+      // Also check for any other tasks that might be running
+      for (const task of deployed.tasks) {
+        if (task.taskId !== deployed.currentTask) {
+          const taskKilled = DetachedExecutor.kill(carrierPath, deployedId, task.taskId);
+          if (taskKilled && !silent) {
+            console.log(`  ✓ Stopped task process: ${task.taskId}`);
+          }
+        }
+      }
+    }
+
+    // Fallback: Try to find processes with the deployment ID in the command
     try {
-      // Use ps to find processes (cross-platform approach)
-      const { stdout } = await execAsync(`ps aux | grep "execute ${deployedId}" | grep -v grep`);
+      const { stdout } = await execAsync(`ps aux | grep "deployedId.*${deployedId}" | grep -v grep`);
       const lines = stdout.trim().split('\n').filter(line => line);
 
       for (const line of lines) {
@@ -117,7 +120,7 @@ async function stopDeployment(
         const pid = parts[1];
         if (pid) {
           if (!silent) {
-            console.log(`  Killing process ${pid}`);
+            console.log(`  Killing orphan process ${pid}`);
           }
           try {
             process.kill(parseInt(pid), 'SIGTERM');
@@ -134,7 +137,6 @@ async function stopDeployment(
     await carrier.updateDeployedStatus(deployedId, 'cancelled');
 
     // Mark current task as cancelled if it's active
-    const deployed = carrier.getDeployedFleet(deployedId);
     if (deployed && deployed.currentTask) {
       await carrier.updateTaskStatus(deployedId, deployed.currentTask, 'cancelled');
     }

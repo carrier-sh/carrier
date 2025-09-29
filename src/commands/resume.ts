@@ -187,15 +187,18 @@ Continue from where the previous tasks left off.`;
 
   console.log('\n🚀 Resuming task execution...');
 
-  // Start task execution (non-blocking)
-  taskExecutor.executeTask({
+  // Use detached execution for proper process management
+  const detachResult = taskExecutor.executeDetached({
     deployedId: deployedId,
     taskId: taskToResume.id,
     agentType: taskToResume.agent,
-    prompt: contextPrompt,
-    background: true,  // Run in background
-    interactive: false // Not interactive
+    prompt: contextPrompt
   });
+
+  if (!detachResult.success) {
+    console.error(`Failed to resume task: ${detachResult.message}`);
+    return;
+  }
 
   console.log(`✅ Deployment ${deployedId} resumed`);
 
