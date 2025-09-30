@@ -200,6 +200,11 @@ export class ClaudeProvider implements AIProvider {
         toolUseCount
       });
 
+      // Create compact context bundle for next agent
+      if (taskCompleted) {
+        this.createContextBundle(config.deployedId, config.taskId);
+      }
+
       return {
         success: taskCompleted,
         output: outputPath,
@@ -828,6 +833,62 @@ Remember to use the Write tool to save your final output in this structured form
       if (this.logStream) {
         this.logStream.write(`Context update error: ${e}\n`);
       }
+    }
+  }
+
+  protected createContextBundle(deployedId: string, taskId: string): void {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const contextPath = path.join(carrierPath, 'deployed', deployedId, 'context', `${taskId}.json`);
+    const bundlePath = path.join(carrierPath, 'deployed', deployedId, 'outputs', `${taskId}.json`);
+
+    if (!fs.existsSync(contextPath)) {
+      return;
+    }
+
+    try {
+      const context = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
+
+      // Deduplicate files accessed
+      const filesMap = new Map<string, { operation: string; timestamp: string }>();
+      (context.filesAccessed || []).forEach((file: any) => {
+        const key = `${file.path}:${file.operation}`;
+        if (!filesMap.has(key) || file.timestamp > filesMap.get(key)!.timestamp) {
+          filesMap.set(key, { operation: file.operation, timestamp: file.timestamp });
+        }
+      });
+
+      const deduplicatedFiles = Array.from(filesMap.entries()).map(([pathOp, info]) => {
+        const [filePath, operation] = pathOp.split(':');
+        return { path: filePath, operation, timestamp: info.timestamp };
+      });
+
+      // Deduplicate commands
+      const commandsMap = new Map<string, string>();
+      (context.commandsExecuted || []).forEach((cmd: any) => {
+        commandsMap.set(cmd.command, cmd.timestamp);
+      });
+
+      const deduplicatedCommands = Array.from(commandsMap.entries()).map(([command, timestamp]) => ({
+        command,
+        timestamp
+      }));
+
+      // Create compact bundle
+      const bundle = {
+        taskId: context.taskId,
+        agentType: context.agentType,
+        status: context.status,
+        duration: context.duration,
+        filesAccessed: deduplicatedFiles,
+        commandsExecuted: deduplicatedCommands,
+        toolsUsed: context.toolsUsed || {},
+        summary: context.keyDecisions?.join('. ') || 'Task completed successfully'
+      };
+
+      // Write bundle to outputs directory
+      fs.writeFileSync(bundlePath, JSON.stringify(bundle, null, 2));
+    } catch (e) {
+      console.warn(`Failed to create context bundle for ${taskId}: ${e}`);
     }
   }
 

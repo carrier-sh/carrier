@@ -166,8 +166,9 @@ export class TaskExecutor {
 
           // Build prompt with inputs from previous tasks
           let nextPrompt = options.prompt; // Start with original request
+          const inputSections: string[] = [];
+
           if (nextTask.inputs) {
-            const inputSections: string[] = [];
             for (const input of nextTask.inputs) {
               if (input.type === 'file' && input.source) {
                 // Load the file from previous task outputs
@@ -179,11 +180,55 @@ export class TaskExecutor {
                 }
               }
             }
+          }
 
-            // Combine original prompt with inputs
-            if (inputSections.length > 0) {
-              nextPrompt = `${options.prompt}\n\n${inputSections.join('\n\n')}`;
+          // Automatically include context bundles from all previous tasks
+          const fs = await import('fs');
+          const path = await import('path');
+          const carrierPath = this.core['carrierPath'];
+          const outputsDir = path.join(carrierPath, 'deployed', options.deployedId, 'outputs');
+
+          if (fs.existsSync(outputsDir)) {
+            const contextBundles: string[] = [];
+            const files = fs.readdirSync(outputsDir);
+
+            for (const file of files) {
+              if (file.endsWith('.json')) {
+                try {
+                  const bundlePath = path.join(outputsDir, file);
+                  const bundle = JSON.parse(fs.readFileSync(bundlePath, 'utf-8'));
+
+                  // Format context bundle for agent consumption
+                  contextBundles.push(`## Context from ${bundle.agentType} (${bundle.taskId})
+
+**Status:** ${bundle.status}
+**Duration:** ${bundle.duration}s
+
+**Files Accessed:**
+${bundle.filesAccessed.map((f: any) => `- ${f.path} (${f.operation})`).join('\n')}
+
+**Commands Executed:**
+${bundle.commandsExecuted.length > 0 ? bundle.commandsExecuted.map((c: any) => `- ${c.command}`).join('\n') : '(none)'}
+
+**Tools Used:**
+${Object.entries(bundle.toolsUsed).map(([tool, count]) => `- ${tool}: ${count}`).join('\n')}
+
+**Summary:** ${bundle.summary}
+`);
+                } catch (error) {
+                  console.warn(`Could not load context bundle ${file}: ${error}`);
+                }
+              }
             }
+
+            if (contextBundles.length > 0) {
+              inputSections.unshift(`# Previous Agent Context\n\n${contextBundles.join('\n---\n\n')}`);
+            }
+          }
+
+          // Combine original prompt with inputs
+          if (inputSections.length > 0) {
+            nextPrompt = `${options.prompt}\n\n${inputSections.join('\n\n')}`;
           }
 
           const nextTaskResult = await this.executeTask({
