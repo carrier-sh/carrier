@@ -43,6 +43,13 @@ export class ClaudeProvider implements AIProvider {
 
     const carrierPath = options.carrierPath || '.carrier';
     this.streamManager = new StreamManager(carrierPath);
+
+    // Set deployment ID for API reporting if provided
+    const deploymentId = process.env.CARRIER_DEPLOYMENT_ID;
+    if (deploymentId) {
+      this.streamManager.setDeploymentId(deploymentId);
+      console.log(`📋 Deployment ID set for API reporting: ${deploymentId}`);
+    }
   }
 
   async executeTask(config: TaskConfig): Promise<TaskResult> {
@@ -53,6 +60,9 @@ export class ClaudeProvider implements AIProvider {
 
     // Start streaming for this task
     this.streamManager.startStream(config.deployedId, config.taskId);
+
+    // Report task start to API
+    await this.streamManager.reportTaskStart(config.deployedId, config.taskId, config.agentType);
 
     // Write initial status
     this.streamManager.writeEvent(config.deployedId, config.taskId, {
@@ -204,6 +214,14 @@ export class ClaudeProvider implements AIProvider {
         this.createContextBundle(config.deployedId, config.taskId);
       }
 
+      // Report task completion to API
+      await this.streamManager.reportTaskComplete(
+        config.deployedId,
+        config.taskId,
+        outputContent,
+        taskCompleted ? 'completed' : 'failed'
+      );
+
       return {
         success: taskCompleted,
         output: outputPath,
@@ -231,6 +249,15 @@ export class ClaudeProvider implements AIProvider {
       if (this.logStream) {
         this.logStream.write(`Error: ${error instanceof Error ? error.stack : String(error)}\n`);
       }
+
+      // Report task failure to API
+      await this.streamManager.reportTaskComplete(
+        config.deployedId,
+        config.taskId,
+        '',
+        'failed',
+        error instanceof Error ? error.message : String(error)
+      );
 
       return {
         success: false,

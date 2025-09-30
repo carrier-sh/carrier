@@ -27,12 +27,17 @@ export class DetachedExecutor {
     }
 
     const pidFile = path.join(logsDir, `${options.taskId}.pid`);
+    const stdoutLog = path.join(logsDir, `${options.taskId}_stdout.log`);
+    const stderrLog = path.join(logsDir, `${options.taskId}_stderr.log`);
+
+    // Open log files for stdout/stderr
+    const stdoutFd = fs.openSync(stdoutLog, 'a');
+    const stderrFd = fs.openSync(stderrLog, 'a');
 
     // Spawn the child process in detached mode
-    // stdout/stderr are ignored - context is tracked via stream/context files
     const child = spawn(process.execPath, [scriptPath, ...args], {
       detached: true,
-      stdio: ['ignore', 'ignore', 'ignore'],
+      stdio: ['ignore', stdoutFd, stderrFd],
       cwd: process.cwd(),
       env: {
         ...process.env,

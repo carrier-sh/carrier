@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createReadStream, createWriteStream, WriteStream } from 'fs';
 import * as readline from 'readline';
+import { APIReporter } from './api-reporter.js';
 
 export interface StreamEvent {
   timestamp: string;
@@ -29,10 +30,76 @@ export class StreamManager extends EventEmitter {
   private activeStreams: Map<string, WriteStream> = new Map();
   private watchers: Map<string, fs.FSWatcher> = new Map();
   private carrierPath: string;
+  private apiReporter: APIReporter | null = null;
+  private eventBuffer: Map<string, StreamEvent[]> = new Map(); // Buffer events per task
+  private batchInterval: NodeJS.Timeout | null = null;
 
   constructor(carrierPath: string = '.carrier') {
     super();
     this.carrierPath = carrierPath;
+    this.initializeAPIReporter();
+  }
+
+  /**
+   * Initialize API reporter from config
+   */
+  private initializeAPIReporter(): void {
+    const apiUrl = process.env.CARRIER_API_URL;
+    const apiKey = process.env.CARRIER_API_KEY;
+    const enabled = process.env.CARRIER_API_REPORTING === 'true' && !!apiUrl;
+
+    if (enabled && apiUrl) {
+      this.apiReporter = new APIReporter({
+        apiUrl,
+        apiKey,
+        enabled: true
+      });
+
+      // Start batch reporting every 2 seconds
+      this.batchInterval = setInterval(() => {
+        this.flushEventBuffers();
+      }, 2000);
+
+      console.log('📡 API reporting enabled:', apiUrl);
+    }
+  }
+
+  /**
+   * Set deployment ID for API reporting
+   */
+  setDeploymentId(deploymentId: string): void {
+    if (this.apiReporter) {
+      this.apiReporter.setDeploymentId(deploymentId);
+    }
+  }
+
+  /**
+   * Flush all buffered events to API
+   */
+  private async flushEventBuffers(): Promise<void> {
+    if (!this.apiReporter) return;
+
+    for (const [taskKey, events] of this.eventBuffer.entries()) {
+      if (events.length === 0) continue;
+
+      const [deployedId, taskId] = taskKey.split(':');
+      await this.apiReporter.batchReportLogs(deployedId, taskId, events);
+
+      // Clear buffer after sending
+      this.eventBuffer.set(taskKey, []);
+    }
+  }
+
+  /**
+   * Clean up resources
+   */
+  destroy(): void {
+    if (this.batchInterval) {
+      clearInterval(this.batchInterval);
+      this.batchInterval = null;
+    }
+    // Flush any remaining events
+    this.flushEventBuffers();
   }
 
   /**
@@ -97,6 +164,48 @@ export class StreamManager extends EventEmitter {
 
     // Emit to listeners
     this.emit('event', fullEvent);
+
+    // Buffer event for API reporting
+    if (this.apiReporter) {
+      if (!this.eventBuffer.has(streamKey)) {
+        this.eventBuffer.set(streamKey, []);
+      }
+      this.eventBuffer.get(streamKey)!.push(fullEvent);
+    }
+  }
+
+  /**
+   * Report task start to API
+   */
+  async reportTaskStart(deployedId: string, taskId: string, agentName: string): Promise<void> {
+    if (this.apiReporter) {
+      await this.apiReporter.reportTaskStart(deployedId, taskId, agentName);
+    }
+  }
+
+  /**
+   * Report task completion to API
+   */
+  async reportTaskComplete(
+    deployedId: string,
+    taskId: string,
+    output: string,
+    status: 'completed' | 'failed',
+    error?: string
+  ): Promise<void> {
+    // Flush any remaining buffered events for this task
+    const streamKey = `${deployedId}:${taskId}`;
+    if (this.apiReporter && this.eventBuffer.has(streamKey)) {
+      const events = this.eventBuffer.get(streamKey)!;
+      if (events.length > 0) {
+        await this.apiReporter.batchReportLogs(deployedId, taskId, events);
+        this.eventBuffer.set(streamKey, []);
+      }
+    }
+
+    if (this.apiReporter) {
+      await this.apiReporter.reportTaskComplete(deployedId, taskId, output, status, error);
+    }
   }
 
   /**
