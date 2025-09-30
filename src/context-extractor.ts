@@ -228,8 +228,8 @@ export class ContextExtractor {
     const serializable = {
       ...context,
       taskContexts: Array.from(context.taskContexts.entries()).map(([k, v]) => ({
-        taskId: k,
         ...v,
+        taskId: k,
         toolsUsed: Array.from(v.toolsUsed.entries())
       })),
       globalFilesModified: Array.from(context.globalFilesModified),
