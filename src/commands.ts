@@ -296,45 +296,8 @@ export class CLICommands {
       path.join(process.env.HOME || '', '.claude') :
       path.join(process.cwd(), '.claude');
 
-    // Add fleet command
-    await this.addFleetCommand(claudePath, fleetId, fleet);
-
     // Add fleet agents if they exist
     await this.addFleetAgents(claudePath, fleetId, fleet);
-  }
-
-  private async addFleetCommand(claudePath: string, fleetId: string, fleet: Fleet): Promise<void> {
-    const commandsPath = path.join(claudePath, 'commands');
-    const fleetCommandPath = path.join(commandsPath, `carrier-${fleetId}.md`);
-
-    // Try to use template
-    const templatePath = path.join(__dirname, '..', 'seed', 'templates', 'fleet-command.md');
-
-    if (fs.existsSync(templatePath)) {
-      // Read template and replace placeholders
-      let template = fs.readFileSync(templatePath, 'utf-8');
-
-      // Generate fleet tasks overview
-      const fleetTasksOverview = fleet.tasks.map((task, i) =>
-        `${i + 1}. **${task.id}**: ${task.description || 'No description'}`
-      ).join('\n');
-
-      // Replace placeholders
-      template = template.replace(/\{\{fleetId\}\}/g, fleetId);
-      template = template.replace(/\{\{fleetDescription\}\}/g, fleet.description || `Deploy the ${fleetId} fleet`);
-      template = template.replace(/\{\{fleetTasksOverview\}\}/g, fleetTasksOverview);
-
-      fs.writeFileSync(fleetCommandPath, template);
-    } else {
-      // Fallback to minimal command if template not found
-      const commandContent = `---
-name: carrier-${fleetId}
-description: ${fleet.description || `Deploy the ${fleetId} fleet`}
----
-
-Deploy the ${fleetId} fleet using: /carrier deploy ${fleetId} "<request>"`;
-      fs.writeFileSync(fleetCommandPath, commandContent);
-    }
   }
 
   private async addFleetAgents(claudePath: string, fleetId: string, fleet: Fleet): Promise<void> {
