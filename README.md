@@ -1,5 +1,7 @@
 # Carrier 🚀
 
+Hi! 👋
+
 **Fleet Orchestration System for Claude Code**
 
 Carrier is a powerful orchestration system that enables you to deploy and manage complex multi-agent workflows (called "fleets") within Claude Code. It provides a CLI interface for deploying, monitoring, and managing sophisticated agent sequences that can handle complex software engineering tasks.

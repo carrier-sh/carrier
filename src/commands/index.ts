@@ -15,4 +15,4 @@ export { clean } from './clean.js';
 export { watch } from './watch.js';
 export { logs } from './logs.js';
 export { stop } from './stop.js';
-export { resume } from './resume.js';
+export { start } from './start.js';

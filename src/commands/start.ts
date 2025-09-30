@@ -1,5 +1,5 @@
 /**
- * Resume command - Resume a stopped/cancelled deployment
+ * Start command - Start or start a stopped/cancelled deployment
  * Continues execution from where it was stopped with full context
  */
 
@@ -7,8 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CarrierCore } from '../core.js';
 import { TaskExecutor } from '../executor.js';
+import { ContextExtractor } from '../context-extractor.js';
 
-export async function resume(
+export async function start(
   carrier: CarrierCore,
   carrierPath: string,
   params: string[]
@@ -19,15 +20,15 @@ export async function resume(
   const isDetached = params.includes('--detach') || params.includes('-d');
 
   if (!deployedId) {
-    console.error('Usage: carrier resume <deployment-id> [options]');
+    console.error('Usage: carrier start <deployment-id> [options]');
     console.error('\nOptions:');
-    console.error('  -f, --force        Resume without confirmation');
-    console.error('  -d, --detach       Resume in background (don\'t attach to output)');
+    console.error('  -f, --force        Start without confirmation');
+    console.error('  -d, --detach       Start in background (don\'t attach to output)');
     console.error('  --from-start       Restart from the beginning (re-run all tasks)');
     console.error('\nExamples:');
-    console.error('  carrier resume 5              # Resume and attach to output');
-    console.error('  carrier resume 5 --detach     # Resume in background');
-    console.error('  carrier resume 5 --from-start # Restart from first task');
+    console.error('  carrier start 5              # Start and attach to output');
+    console.error('  carrier start 5 --detach     # Start in background');
+    console.error('  carrier start 5 --from-start # Restart from first task');
     return;
   }
 
@@ -44,7 +45,7 @@ export async function resume(
     const currentTaskStatus = deployed.tasks.find(t => t.taskId === deployed.currentTask);
     if (currentTaskStatus && currentTaskStatus.status === 'failed') {
       console.log(`Deployment ${deployedId} has a failed task: ${deployed.currentTask}`);
-      console.log('Proceeding with resume...');
+      console.log('Proceeding with start...');
     } else {
       console.log(`Deployment ${deployedId} is already active`);
       console.log('Use "carrier status" to check progress');
@@ -57,18 +58,18 @@ export async function resume(
     return;
   }
 
-  // Allow resume if status is cancelled, failed, or has a failed task
+  // Allow start if status is cancelled, failed, or has a failed task
   const hasFailedTask = deployed.tasks.some(t => t.status === 'failed');
   if (deployed.status !== 'cancelled' && deployed.status !== 'failed' && !hasFailedTask && !fromStart) {
     console.log(`Deployment ${deployedId} has status: ${deployed.status}`);
-    console.log('Only cancelled, failed, or deployments with failed tasks can be resumed');
+    console.log('Only cancelled, failed, or deployments with failed tasks can be started');
     console.log('Use --from-start to restart from the beginning');
     return;
   }
 
   // Show confirmation unless forced
   if (!force) {
-    console.log(`\n📋 About to resume deployment ${deployedId}`);
+    console.log(`\n📋 About to start deployment ${deployedId}`);
     console.log(`   Fleet: ${deployed.fleetId}`);
     console.log(`   Request: ${deployed.request}`);
     console.log(`   Previous status: ${deployed.status}`);
@@ -91,15 +92,15 @@ export async function resume(
   // Get the fleet configuration
   const fleet = carrier.loadFleet(deployed.fleetId);
 
-  // Determine which task to resume from
-  let taskToResume: any;
+  // Determine which task to start from
+  let taskToStart: any;
   let taskIndex = 0;
 
   if (fromStart) {
     // Start from the beginning
-    taskToResume = fleet.tasks[0];
+    taskToStart = fleet.tasks[0];
     taskIndex = 0;
-    console.log(`\n🔄 Restarting from first task: ${taskToResume.id}`);
+    console.log(`\n🔄 Restarting from first task: ${taskToStart.id}`);
 
     // Reset all task statuses
     for (const task of deployed.tasks) {
@@ -108,16 +109,16 @@ export async function resume(
   } else {
     // Find the task that was interrupted
     if (deployed.currentTask) {
-      // Resume from current task
-      taskToResume = fleet.tasks.find(t => t.id === deployed.currentTask);
+      // Start from current task
+      taskToStart = fleet.tasks.find(t => t.id === deployed.currentTask);
       taskIndex = fleet.tasks.findIndex(t => t.id === deployed.currentTask);
 
-      if (!taskToResume) {
+      if (!taskToStart) {
         console.error(`Could not find task ${deployed.currentTask} in fleet`);
         return;
       }
 
-      console.log(`\n🔄 Resuming from task: ${taskToResume.id}`);
+      console.log(`\n🔄 Starting from task: ${taskToStart.id}`);
     } else {
       // Find first non-complete task
       for (let i = 0; i < fleet.tasks.length; i++) {
@@ -125,82 +126,98 @@ export async function resume(
         const deployedTask = deployed.tasks.find(dt => dt.taskId === task.id);
 
         if (!deployedTask || deployedTask.status !== 'complete') {
-          taskToResume = task;
+          taskToStart = task;
           taskIndex = i;
           break;
         }
       }
 
-      if (!taskToResume) {
-        console.log('All tasks are complete, nothing to resume');
+      if (!taskToStart) {
+        console.log('All tasks are complete, nothing to start');
         return;
       }
 
-      console.log(`\n🔄 Resuming from task: ${taskToResume.id}`);
+      console.log(`\n🔄 Starting from task: ${taskToStart.id}`);
     }
   }
 
   // Update deployment status to active
-  await carrier.updateDeployedStatus(deployedId, 'active', taskToResume.id, taskToResume.agent);
+  await carrier.updateDeployedStatus(deployedId, 'active', taskToStart.id, taskToStart.agent);
   console.log('✓ Updated deployment status to active');
 
-  // Build the context from previous task outputs
+  // Build smart context using the context extractor
   let contextPrompt = deployed.request; // Start with original request
 
-  // Gather outputs from completed tasks to provide context
-  if (!fromStart && taskIndex > 0) {
-    console.log('📚 Gathering context from previous tasks...');
+  if (!fromStart) {
+    console.log('📚 Extracting smart context from previous execution...');
 
-    const contextSections: string[] = [];
+    const contextExtractor = new ContextExtractor(carrierPath);
 
-    for (let i = 0; i < taskIndex; i++) {
-      const prevTask = fleet.tasks[i];
-      const outputPath = path.join(carrierPath, 'deployed', deployedId, 'outputs', `${prevTask.id}.md`);
+    try {
+      // Extract context from streams and logs
+      const deploymentContext = await contextExtractor.extractDeploymentContext(deployedId);
 
-      if (fs.existsSync(outputPath)) {
-        try {
-          const outputContent = fs.readFileSync(outputPath, 'utf-8');
-          contextSections.push(`## Previous Task: ${prevTask.id}\n\n${outputContent}`);
-          console.log(`  ✓ Loaded context from ${prevTask.id}`);
-        } catch (error) {
-          console.warn(`  ⚠️  Could not load output from ${prevTask.id}`);
+      // Generate compact but effective resumption prompt
+      contextPrompt = contextExtractor.generateResumptionPrompt(deploymentContext);
+
+      // Save context cache for future use
+      await contextExtractor.saveContextCache(deployedId);
+
+      console.log('✓ Smart context extracted:');
+      console.log(`  - Files read: ${deploymentContext.globalFilesRead.size}`);
+      console.log(`  - Files modified: ${deploymentContext.globalFilesModified.size}`);
+      console.log(`  - Tasks completed: ${deploymentContext.tasksCompleted.length}`);
+
+      // Add task-specific context if starting from a specific task
+      const currentTaskContext = deploymentContext.taskContexts.get(taskToStart.id);
+      if (currentTaskContext && currentTaskContext.filesAccessed.length > 0) {
+        console.log(`  - Current task progress: ${currentTaskContext.lastActivity || 'In progress'}`);
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not extract smart context, falling back to basic context');
+
+      // Fallback to loading output files
+      const contextSections: string[] = [];
+      for (let i = 0; i < taskIndex; i++) {
+        const prevTask = fleet.tasks[i];
+        const outputPath = path.join(carrierPath, 'deployed', deployedId, 'outputs', `${prevTask.id}.md`);
+
+        if (fs.existsSync(outputPath)) {
+          try {
+            const outputContent = fs.readFileSync(outputPath, 'utf-8');
+            contextSections.push(`## Previous Task: ${prevTask.id}\n\n${outputContent}`);
+            console.log(`  ✓ Loaded output from ${prevTask.id}`);
+          } catch (error) {
+            console.warn(`  ⚠️  Could not load output from ${prevTask.id}`);
+          }
         }
       }
-    }
 
-    // Add context to prompt
-    if (contextSections.length > 0) {
-      contextPrompt = `${deployed.request}
-
-## Context from Previous Tasks
-
-${contextSections.join('\n\n')}
-
-## Instructions
-You are resuming a stopped deployment. The above context shows what has been completed so far.
-Continue from where the previous tasks left off.`;
+      if (contextSections.length > 0) {
+        contextPrompt = `${deployed.request}\n\n## Context from Previous Tasks\n\n${contextSections.join('\n\n')}\n\n## Instructions\nYou are resuming a stopped deployment. Continue from where the previous tasks left off.`;
+      }
     }
   }
 
   // Create task executor with context
   const taskExecutor = new TaskExecutor(carrier, carrierPath);
 
-  console.log('\n🚀 Resuming task execution...');
+  console.log('\n🚀 Starting task execution...');
 
   // Use detached execution for proper process management
   const detachResult = taskExecutor.executeDetached({
     deployedId: deployedId,
-    taskId: taskToResume.id,
-    agentType: taskToResume.agent,
+    taskId: taskToStart.id,
+    agentType: taskToStart.agent,
     prompt: contextPrompt
   });
 
   if (!detachResult.success) {
-    console.error(`Failed to resume task: ${detachResult.message}`);
+    console.error(`Failed to start task: ${detachResult.message}`);
     return;
   }
 
-  console.log(`✅ Deployment ${deployedId} resumed`);
+  console.log(`✅ Deployment ${deployedId} started`);
 
   if (isDetached) {
     // Detached mode: Return immediately

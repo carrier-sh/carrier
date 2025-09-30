@@ -202,8 +202,8 @@ export class CLICommands {
     return commands.stop(this.carrier, this.carrierPath, params);
   }
 
-  async resume(params: string[]): Promise<void> {
-    return commands.resume(this.carrier, this.carrierPath, params);
+  async start(params: string[]): Promise<void> {
+    return commands.start(this.carrier, this.carrierPath, params);
   }
 
   // Helper methods that are still needed by init and other commands

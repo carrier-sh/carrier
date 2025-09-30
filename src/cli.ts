@@ -142,9 +142,10 @@ async function handleCommand() {
     case 's':
     case 'cancel':
       return await cli.stop(allParams);
+    case 'start':
     case 'resume':
     case 'continue':
-      return await cli.resume(allParams);
+      return await cli.start(allParams);
     case 'help':
       return await cli.help(params);
     default:

@@ -224,16 +224,17 @@ export const COMMANDS: Record<string, Command> = {
     requiresInit: true
   },
 
-  'resume': {
-    name: 'resume',
-    aliases: ['continue'],
-    description: 'Resume a stopped/cancelled deployment with context',
-    usage: 'carrier resume <deployment-id> [--force] [--from-start]',
+  'start': {
+    name: 'start',
+    aliases: ['resume', 'continue'],
+    description: 'Start or resume a stopped/cancelled deployment with context',
+    usage: 'carrier start <deployment-id> [--force] [--from-start]',
     examples: [
-      'carrier resume 5                 # Resume deployment 5 from where it stopped',
-      'carrier resume 5 --force         # Resume without confirmation',
-      'carrier resume 5 --from-start    # Restart from the beginning',
-      'carrier continue 5               # Same as resume (alias)'
+      'carrier start 5                  # Start/resume deployment 5 from where it stopped',
+      'carrier start 5 --force          # Start without confirmation',
+      'carrier start 5 --from-start     # Restart from the beginning',
+      'carrier resume 5                 # Same as start (alias)',
+      'carrier continue 5               # Same as start (alias)'
     ],
     category: 'core',
     requiresInit: true

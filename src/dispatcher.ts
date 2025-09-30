@@ -5,7 +5,6 @@
 
 import { ProviderRegistryManager } from './providers/provider-registry.js';
 import { ClaudeProvider } from './providers/claude-provider.js';
-import { EnhancedClaudeProvider } from './providers/claude-provider-enhanced.js';
 import { TaskConfig, TaskResult, AIProvider, ClaudeProviderOptions } from './types/index.js';
 
 export interface TaskDispatcherOptions {
@@ -13,7 +12,6 @@ export interface TaskDispatcherOptions {
   isGlobal?: boolean;
   defaultProvider?: string;
   providerOptions?: Record<string, any>;
-  useEnhancedProvider?: boolean;  // Enable enhanced streaming provider
 }
 
 export class TaskDispatcher {
@@ -37,17 +35,10 @@ export class TaskDispatcher {
       ...this.options.providerOptions?.claude
     };
 
-    // Use enhanced provider if enabled (default: true for better visibility)
-    const useEnhanced = this.options.useEnhancedProvider !== false;
-
-    if (useEnhanced) {
-      console.log('🚀 Using Enhanced Claude Provider with real-time streaming');
-      const enhancedProvider = new EnhancedClaudeProvider(claudeOptions);
-      this.registry.registerProvider(enhancedProvider);
-    } else {
-      const claudeProvider = new ClaudeProvider(claudeOptions);
-      this.registry.registerProvider(claudeProvider);
-    }
+    // Initialize the unified Claude provider with streaming support
+    console.log('🚀 Using Claude Provider with real-time streaming');
+    const claudeProvider = new ClaudeProvider(claudeOptions);
+    this.registry.registerProvider(claudeProvider);
 
     // Set default provider
     if (this.options.defaultProvider) {
