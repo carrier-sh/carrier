@@ -613,12 +613,32 @@ export class ClaudeProvider implements AIProvider {
 After completing your task, save your final report/analysis to:
 ${outputPath}
 
-Your output should be in markdown format and include:
-1. A clear summary of what was accomplished
-2. Any relevant findings or analysis
-3. Next steps or recommendations (if applicable)
+Your output MUST follow this structured format:
 
-Remember to use the Write tool to save your final output to the specified path.
+\`\`\`markdown
+# Agent: {agent-type}
+# Task: {task-id}
+
+## Context Gathered
+
+List all relevant context you discovered and used to complete this task. Be concise and deduplicated:
+
+- File references (e.g., src/auth/login.ts:45-67 - JWT implementation)
+- Search queries performed
+- Key findings from code analysis
+- Configuration or environment details examined
+- Any other context that informed your work
+
+## Output
+
+Provide your actual deliverable here:
+
+1. Summary of what was accomplished
+2. Analysis, decisions, or implementation details
+3. Next steps or recommendations (if applicable)
+\`\`\`
+
+Remember to use the Write tool to save your final output in this structured format to the specified path.
 `;
 
     let agentPrompt = config.prompt;
