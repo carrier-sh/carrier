@@ -108,7 +108,18 @@ export class ClaudeProvider implements AIProvider {
           permissionMode: this.options.permissionMode as PermissionMode,
           maxTurns: config.maxTurns || 60,
           includePartialMessages: true,
-          maxThinkingTokens: 200000  // Enable thinking mode to capture reasoning
+          maxThinkingTokens: 200000,  // Enable thinking mode to capture reasoning
+          hooks: {
+            PreToolUse: [{
+              hooks: [async (event) => {
+                // Update context when tools are about to be used
+                if (event.tool_name && event.tool_input) {
+                  this.updateContextFromTool(config.deployedId, config.taskId, event.tool_name, event.tool_input);
+                }
+                return { continue: true };
+              }]
+            }]
+          }
         }
       });
 
@@ -313,9 +324,6 @@ export class ClaudeProvider implements AIProvider {
                 input: toolInput
               }
             });
-
-            // Update context with file/command information
-            this.updateContextFromTool(deployedId, taskId, toolName, toolInput);
 
             // Clean up
             delete this.toolInputBuffer[this.pendingToolInfo.id];
