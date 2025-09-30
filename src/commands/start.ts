@@ -149,12 +149,16 @@ export async function start(
   let contextPrompt = deployed.request; // Start with original request
 
   if (!fromStart) {
-    console.log('📚 Extracting smart context from previous execution...');
+    console.log('📚 Extracting and compacting context from previous execution...');
 
     const contextExtractor = new ContextExtractor(carrierPath);
 
     try {
-      // Extract context from streams and logs
+      // First, compact all existing context files in-place
+      console.log('🗜️  Compacting context files...');
+      contextExtractor.compactAllTaskContexts(deployedId);
+
+      // Extract context from compacted files
       const deploymentContext = await contextExtractor.extractDeploymentContext(deployedId);
 
       // Generate compact but effective resumption prompt

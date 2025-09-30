@@ -272,4 +272,110 @@ export class ContextExtractor {
 
     return context;
   }
+
+  /**
+   * Compact a task's context JSON file in-place
+   * Removes redundant data, deduplicates file accesses, and keeps essential info
+   */
+  compactTaskContext(deployedId: string, taskId: string): void {
+    const contextPath = path.join(
+      this.carrierPath,
+      'deployed',
+      deployedId,
+      'context',
+      `${taskId}.json`
+    );
+
+    if (!fs.existsSync(contextPath)) {
+      console.warn(`Context file not found: ${contextPath}`);
+      return;
+    }
+
+    try {
+      const rawContext = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
+
+      // Deduplicate file accesses - keep only last operation per file
+      const fileAccessMap = new Map<string, any>();
+      if (rawContext.filesAccessed && Array.isArray(rawContext.filesAccessed)) {
+        rawContext.filesAccessed.forEach((access: any) => {
+          // Keep the most recent operation for each file
+          const existing = fileAccessMap.get(access.path);
+          if (!existing || new Date(access.timestamp) > new Date(existing.timestamp)) {
+            fileAccessMap.set(access.path, access);
+          }
+        });
+      }
+
+      // Deduplicate commands - keep unique commands only
+      const commandMap = new Map<string, any>();
+      if (rawContext.commandsExecuted && Array.isArray(rawContext.commandsExecuted)) {
+        rawContext.commandsExecuted.forEach((cmd: any) => {
+          const key = `${cmd.command}:${cmd.directory || '.'}`;
+          commandMap.set(key, cmd);
+        });
+      }
+
+      // Keep only essential fields
+      const compactedContext = {
+        taskId: rawContext.taskId,
+        agentType: rawContext.agentType,
+        deployedId: rawContext.deployedId,
+        status: rawContext.status,
+        startedAt: rawContext.startedAt,
+        completedAt: rawContext.completedAt,
+        duration: rawContext.duration,
+        filesAccessed: Array.from(fileAccessMap.values()),
+        commandsExecuted: Array.from(commandMap.values()),
+        toolsUsed: rawContext.toolsUsed || {},
+        keyDecisions: rawContext.keyDecisions || [],
+        lastActivity: rawContext.lastActivity,
+        totalTokens: rawContext.totalTokens,
+        turnCount: rawContext.turnCount,
+        toolUseCount: rawContext.toolUseCount
+      };
+
+      // Calculate size reduction
+      const originalSize = JSON.stringify(rawContext).length;
+      const compactedSize = JSON.stringify(compactedContext).length;
+      const reduction = ((originalSize - compactedSize) / originalSize * 100).toFixed(1);
+
+      // Write compacted version back
+      fs.writeFileSync(contextPath, JSON.stringify(compactedContext, null, 2));
+
+      console.log(`  ✓ Compacted ${taskId}: ${originalSize} → ${compactedSize} bytes (${reduction}% reduction)`);
+    } catch (error) {
+      console.error(`Failed to compact context for ${taskId}:`, error);
+    }
+  }
+
+  /**
+   * Compact all task contexts for a deployment
+   */
+  compactAllTaskContexts(deployedId: string): void {
+    const contextDir = path.join(
+      this.carrierPath,
+      'deployed',
+      deployedId,
+      'context'
+    );
+
+    if (!fs.existsSync(contextDir)) {
+      console.warn(`No context directory found for deployment ${deployedId}`);
+      return;
+    }
+
+    const contextFiles = fs.readdirSync(contextDir).filter(f => f.endsWith('.json'));
+
+    if (contextFiles.length === 0) {
+      console.log('  No context files to compact');
+      return;
+    }
+
+    console.log(`  Compacting ${contextFiles.length} context file(s)...`);
+
+    for (const file of contextFiles) {
+      const taskId = file.replace('.json', '');
+      this.compactTaskContext(deployedId, taskId);
+    }
+  }
 }
