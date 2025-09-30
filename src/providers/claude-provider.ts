@@ -180,6 +180,15 @@ export class ClaudeProvider implements AIProvider {
         }
       });
 
+      // Update context to complete
+      this.updateAgentContext(config.deployedId, config.taskId, {
+        status: taskCompleted ? 'complete' : 'failed',
+        completedAt: new Date().toISOString(),
+        duration: Math.round((Date.now() - startTime) / 1000),
+        turnCount,
+        toolUseCount
+      });
+
       return {
         success: taskCompleted,
         output: outputPath,
@@ -195,6 +204,18 @@ export class ClaudeProvider implements AIProvider {
           stack: error instanceof Error ? error.stack : undefined
         }
       });
+
+      // Update context with error
+      this.updateAgentContext(config.deployedId, config.taskId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+        completedAt: new Date().toISOString()
+      });
+
+      // Log error to error log file
+      if (this.logStream) {
+        this.logStream.write(`Error: ${error instanceof Error ? error.stack : String(error)}\n`);
+      }
 
       return {
         success: false,
@@ -281,16 +302,20 @@ export class ClaudeProvider implements AIProvider {
         if (this.pendingToolInfo && this.toolInputBuffer[this.pendingToolInfo.id]) {
           try {
             const toolInput = JSON.parse(this.toolInputBuffer[this.pendingToolInfo.id]);
+            const toolName = this.pendingToolInfo.name;
 
             this.streamManager.writeEvent(deployedId, taskId, {
               type: 'tool_use',
               content: {
-                name: this.pendingToolInfo.name,
+                name: toolName,
                 status: 'queued',
                 id: this.pendingToolInfo.id,
                 input: toolInput
               }
             });
+
+            // Update context with file/command information
+            this.updateContextFromTool(deployedId, taskId, toolName, toolInput);
 
             // Clean up
             delete this.toolInputBuffer[this.pendingToolInfo.id];
@@ -621,22 +646,161 @@ Remember to use the Write tool to save your final output to the specified path.
   protected initializeLogging(config: TaskConfig): string {
     const carrierPath = this.options.carrierPath || '.carrier';
     const logDir = path.join(carrierPath, 'deployed', config.deployedId, 'logs');
+    const contextDir = path.join(carrierPath, 'deployed', config.deployedId, 'context');
 
+    // Ensure both directories exist
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
+    if (!fs.existsSync(contextDir)) {
+      fs.mkdirSync(contextDir, { recursive: true });
+    }
 
+    // Keep error log file
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const logPath = path.join(logDir, `${config.taskId}_${timestamp}.json`);
+    const logPath = path.join(logDir, `${config.taskId}_${timestamp}_errors.log`);
 
     this.currentLogPath = logPath;
     this.logEntries = [];
 
-    // Initialize log file
+    // Create error log file
     this.logStream = fs.createWriteStream(logPath, { flags: 'w' });
-    this.logStream.write('[\n');
+
+    // Generate real-time context for this agent
+    this.generateAgentContext(config);
 
     return logPath;
+  }
+
+  protected generateAgentContext(config: TaskConfig): void {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const contextPath = path.join(
+      carrierPath,
+      'deployed',
+      config.deployedId,
+      'context',
+      `${config.taskId}.json`
+    );
+
+    // Initialize context structure
+    const context = {
+      taskId: config.taskId,
+      agentType: config.agentType,
+      deployedId: config.deployedId,
+      startedAt: new Date().toISOString(),
+      filesAccessed: [] as any[],
+      commandsExecuted: [] as any[],
+      toolsUsed: {} as Record<string, number>,
+      keyDecisions: [] as string[],
+      lastActivity: '',
+      status: 'running'
+    };
+
+    // Save initial context
+    fs.writeFileSync(contextPath, JSON.stringify(context, null, 2));
+  }
+
+  protected updateAgentContext(deployedId: string, taskId: string, update: any): void {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const contextPath = path.join(
+      carrierPath,
+      'deployed',
+      deployedId,
+      'context',
+      `${taskId}.json`
+    );
+
+    if (!fs.existsSync(contextPath)) {
+      return;
+    }
+
+    try {
+      const context = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
+
+      // Merge updates
+      Object.assign(context, update);
+
+      // Write back
+      fs.writeFileSync(contextPath, JSON.stringify(context, null, 2));
+    } catch (e) {
+      // Ignore errors in context update
+    }
+  }
+
+  protected updateContextFromTool(deployedId: string, taskId: string, toolName: string, toolInput: any): void {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const contextPath = path.join(
+      carrierPath,
+      'deployed',
+      deployedId,
+      'context',
+      `${taskId}.json`
+    );
+
+    if (!fs.existsSync(contextPath)) {
+      return;
+    }
+
+    try {
+      const context = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
+
+      // Track tool usage
+      if (!context.toolsUsed) context.toolsUsed = {};
+      context.toolsUsed[toolName] = (context.toolsUsed[toolName] || 0) + 1;
+
+      // Track file access
+      if (!context.filesAccessed) context.filesAccessed = [];
+
+      if (toolName === 'Read' && toolInput?.file_path) {
+        context.filesAccessed.push({
+          path: toolInput.file_path,
+          operation: 'read',
+          timestamp: new Date().toISOString()
+        });
+      } else if (toolName === 'Write' && toolInput?.file_path) {
+        context.filesAccessed.push({
+          path: toolInput.file_path,
+          operation: 'write',
+          timestamp: new Date().toISOString()
+        });
+      } else if (toolName === 'Edit' && toolInput?.file_path) {
+        context.filesAccessed.push({
+          path: toolInput.file_path,
+          operation: 'edit',
+          timestamp: new Date().toISOString()
+        });
+      } else if (toolName === 'Bash' && toolInput?.command) {
+        if (!context.commandsExecuted) context.commandsExecuted = [];
+        context.commandsExecuted.push({
+          command: toolInput.command,
+          timestamp: new Date().toISOString()
+        });
+      } else if (toolName === 'Glob' && toolInput?.pattern) {
+        context.filesAccessed.push({
+          path: `[search: ${toolInput.pattern}]`,
+          operation: 'search',
+          timestamp: new Date().toISOString()
+        });
+      } else if (toolName === 'Grep' && toolInput?.pattern) {
+        context.filesAccessed.push({
+          path: `[grep: ${toolInput.pattern}]`,
+          operation: 'search',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Update last activity
+      context.lastActivity = `Used tool: ${toolName}`;
+      context.lastUpdated = new Date().toISOString();
+
+      // Write back
+      fs.writeFileSync(contextPath, JSON.stringify(context, null, 2));
+    } catch (e) {
+      // Log to error file if context update fails
+      if (this.logStream) {
+        this.logStream.write(`Context update error: ${e}\n`);
+      }
+    }
   }
 
   protected extractTextContent(content: any): string {
