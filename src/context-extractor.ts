@@ -1,11 +1,10 @@
 /**
  * Context Extractor - Extracts and compacts task execution context for resumption
- * Analyzes stream data to build minimal but effective context
+ * Loads context from task context JSON files (single source of truth)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'readline';
 
 export interface FileAccess {
   path: string;
@@ -76,28 +75,30 @@ export class ContextExtractor {
       globalFilesRead: new Set()
     };
 
-    // Extract context from each task's stream
-    const streamsPath = path.join(deployedPath, 'streams');
-    if (fs.existsSync(streamsPath)) {
-      const streamFiles = fs.readdirSync(streamsPath)
-        .filter(f => f.endsWith('.stream'));
+    // Extract context from each task's context JSON file (single source of truth)
+    const contextPath = path.join(deployedPath, 'context');
+    if (fs.existsSync(contextPath)) {
+      const contextFiles = fs.readdirSync(contextPath)
+        .filter(f => f.endsWith('.json'));
 
-      for (const streamFile of streamFiles) {
-        const taskId = streamFile.replace('.stream', '');
-        const taskContext = await this.extractTaskContext(
-          path.join(streamsPath, streamFile),
+      for (const contextFile of contextFiles) {
+        const taskId = contextFile.replace('.json', '');
+        const taskContext = this.loadTaskContext(
+          path.join(contextPath, contextFile),
           taskId
         );
-        context.taskContexts.set(taskId, taskContext);
+        if (taskContext) {
+          context.taskContexts.set(taskId, taskContext);
 
-        // Aggregate global file access
-        taskContext.filesAccessed.forEach(fa => {
-          if (fa.operation === 'read') {
-            context.globalFilesRead.add(fa.path);
-          } else {
-            context.globalFilesModified.add(fa.path);
-          }
-        });
+          // Aggregate global file access
+          taskContext.filesAccessed.forEach(fa => {
+            if (fa.operation === 'read') {
+              context.globalFilesRead.add(fa.path);
+            } else {
+              context.globalFilesModified.add(fa.path);
+            }
+          });
+        }
       }
     }
 
@@ -105,89 +106,39 @@ export class ContextExtractor {
   }
 
   /**
-   * Extract context from a single task's stream
+   * Load context from a task's context JSON file
    */
-  private async extractTaskContext(streamPath: string, taskId: string): Promise<TaskContext> {
-    const context: TaskContext = {
-      taskId,
-      filesAccessed: [],
-      commandsExecuted: [],
-      toolsUsed: new Map(),
-      keyDecisions: [],
-      lastActivity: ''
-    };
-
-    const fileStream = fs.createReadStream(streamPath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity
-    });
-
-    for await (const line of rl) {
-      try {
-        const event = JSON.parse(line);
-
-        // Track tool usage
-        if (event.type === 'tool_use' && event.content?.name) {
-          const toolName = event.content.name;
-          context.toolsUsed.set(toolName, (context.toolsUsed.get(toolName) || 0) + 1);
-
-          // Extract file paths from tool input (if present)
-          const input = event.content.input || event.content.parameters;
-
-          if (toolName === 'Read' && input?.file_path) {
-            context.filesAccessed.push({
-              path: input.file_path,
-              operation: 'read',
-              timestamp: event.timestamp
-            });
-          } else if (toolName === 'Write' && input?.file_path) {
-            context.filesAccessed.push({
-              path: input.file_path,
-              operation: 'write',
-              timestamp: event.timestamp
-            });
-          } else if (toolName === 'Edit' && input?.file_path) {
-            context.filesAccessed.push({
-              path: input.file_path,
-              operation: 'edit',
-              timestamp: event.timestamp
-            });
-          } else if (toolName === 'Bash' && input?.command) {
-            context.commandsExecuted.push({
-              command: input.command,
-              directory: input.cwd,
-              timestamp: event.timestamp
-            });
-          } else if (toolName === 'Glob' && input?.pattern) {
-            // Track glob patterns as a way to understand what files were searched for
-            if (!context.filesAccessed.find(f => f.path === `[search: ${input.pattern}]`)) {
-              context.filesAccessed.push({
-                path: `[search: ${input.pattern}]`,
-                operation: 'read',
-                timestamp: event.timestamp
-              });
-            }
-          }
-        }
-
-        // Track key decisions from agent activity
-        if (event.type === 'agent_activity' && event.content?.activity) {
-          const activity = event.content.activity;
-          context.lastActivity = activity;
-
-          // Identify key decision points
-          if (activity.includes('will') || activity.includes('need to') ||
-              activity.includes('should') || activity.includes('must')) {
-            context.keyDecisions.push(activity);
-          }
-        }
-      } catch (e) {
-        // Skip malformed lines
-      }
+  private loadTaskContext(contextFilePath: string, taskId: string): TaskContext | null {
+    if (!fs.existsSync(contextFilePath)) {
+      return null;
     }
 
-    return context;
+    try {
+      const contextData = JSON.parse(fs.readFileSync(contextFilePath, 'utf-8'));
+
+      // Convert toolsUsed object to Map
+      const toolsUsed = new Map<string, number>();
+      if (contextData.toolsUsed) {
+        Object.entries(contextData.toolsUsed).forEach(([tool, count]) => {
+          toolsUsed.set(tool, count as number);
+        });
+      }
+
+      const context: TaskContext = {
+        taskId: contextData.taskId || taskId,
+        filesAccessed: contextData.filesAccessed || [],
+        commandsExecuted: contextData.commandsExecuted || [],
+        toolsUsed,
+        keyDecisions: contextData.keyDecisions || [],
+        lastActivity: contextData.lastActivity || '',
+        totalTokens: contextData.totalTokens
+      };
+
+      return context;
+    } catch (e) {
+      console.error(`Failed to load context from ${contextFilePath}:`, e);
+      return null;
+    }
   }
 
   /**
