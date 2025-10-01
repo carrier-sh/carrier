@@ -125,8 +125,8 @@ export async function deploy(
 
         // Update in registry
         const registry = carrier.loadRegistry();
-        const deploymentIndex = registry.deployedFleets.findIndex(d => d.id === result.data.id);
-        if (deploymentIndex !== -1) {
+        const deploymentIndex = registry.deployedFleets.findIndex(d => d.id === result.data?.id);
+        if (deploymentIndex !== -1 && result.data) {
           registry.deployedFleets[deploymentIndex] = result.data;
           carrier.saveRegistry(registry);
         }
