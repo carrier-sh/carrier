@@ -360,14 +360,14 @@ export class StreamManager extends EventEmitter {
 
     switch (event.type) {
       case 'agent_activity':
-        console.log(`${time} ${taskPrefix} 🤖 ${event.content.activity || event.content}`);
+        console.log(`${time} ${taskPrefix} 🤖 ${(event.content as any).activity || event.content}`);
         break;
 
       case 'tool_use':
-        const tool = event.content;
+        const tool = event.content as any;
         if (tool.name) {
           const params = this.formatToolParams(tool);
-          console.log(`${time} ${taskPrefix} 🔧 ${tool.name}${params ? `: ${params}` : ''}`);
+          console.log(`${time} ${taskPrefix} 🔧 ${tool.name as string}${params ? `: ${params}` : ''}`);
         }
         break;
 
@@ -380,24 +380,24 @@ export class StreamManager extends EventEmitter {
         break;
 
       case 'output':
-        console.log(`${time} ${taskPrefix} 📝 ${event.content}`);
+        console.log(`${time} ${taskPrefix} 📝 ${event.content as string}`);
         break;
 
       case 'error':
-        console.log(`${time} ${taskPrefix} ❌ ${event.content.message || event.content}`);
+        console.log(`${time} ${taskPrefix} ❌ ${(event.content as any).message || event.content}`);
         break;
 
       case 'status':
-        console.log(`${time} ${taskPrefix} ℹ️  ${event.content.message || event.content.status}`);
+        console.log(`${time} ${taskPrefix} ℹ️  ${(event.content as any).message || (event.content as any).status}`);
         break;
 
       case 'progress':
-        const progress = event.content;
+        const progress = event.content as any;
         if (progress.percentage !== undefined) {
-          const bar = this.createProgressBar(progress.percentage);
-          console.log(`${time} ${taskPrefix} ${bar} ${progress.message || ''}`);
+          const bar = this.createProgressBar(progress.percentage as number);
+          console.log(`${time} ${taskPrefix} ${bar} ${(progress.message as string) || ''}`);
         } else {
-          console.log(`${time} ${taskPrefix} ⏳ ${progress.message || 'Processing...'}`);
+          console.log(`${time} ${taskPrefix} ⏳ ${(progress.message as string) || 'Processing...'}`);
         }
         break;
     }

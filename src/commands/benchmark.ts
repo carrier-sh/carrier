@@ -1,6 +1,8 @@
 import { CarrierCore } from '../core.js';
 import { TaskExecutor } from '../executor.js';
 import { StreamManager } from '../stream.js';
+import { join } from 'path';
+import { mkdirSync, writeFileSync } from 'fs';
 
 interface BenchmarkResult {
   agentName: string;
@@ -78,8 +80,11 @@ export async function benchmark(
         ]
       };
 
-      // Save temporary fleet
-      carrier.saveFleet(fleet);
+      // Save temporary fleet to filesystem
+      const fleetDir = join(carrierPath, 'fleets', fleetId);
+      const fleetPath = join(fleetDir, `${fleetId}.json`);
+      mkdirSync(fleetDir, { recursive: true });
+      writeFileSync(fleetPath, JSON.stringify(fleet, null, 2));
 
       // Deploy the fleet
       const deployment = await carrier.createDeployed(fleetId, task);
@@ -90,7 +95,7 @@ export async function benchmark(
         return result;
       }
 
-      result.deploymentId = deployment.data.id;
+      result.deploymentId = deployment.data.id as unknown as number;
 
       // Execute the task
       const taskExecutor = new TaskExecutor(carrier, carrierPath, {
@@ -105,17 +110,17 @@ export async function benchmark(
         }
       });
 
-      const streamManager = new StreamManager(carrierPath, deployment.data.id);
+      const streamManager = new StreamManager(carrierPath);
 
       // Track metrics from stream events
-      const unsubscribe = streamManager.subscribe((event) => {
-        if (event.type === 'tool_use' && event.content.name === 'Read') {
+      streamManager.on('event', (event: any) => {
+        if (event.type === 'tool_use' && (event.content as any).name === 'Read') {
           result.filesRead++;
         }
-        if (event.type === 'tool_use' && (event.content.name === 'Write' || event.content.name === 'Edit')) {
+        if (event.type === 'tool_use' && ((event.content as any).name === 'Write' || (event.content as any).name === 'Edit')) {
           result.filesModified++;
         }
-        if (event.type === 'tool_use' && event.content.name === 'Bash') {
+        if (event.type === 'tool_use' && (event.content as any).name === 'Bash') {
           result.commandsRun++;
         }
         if (event.type === 'error') {
@@ -123,14 +128,12 @@ export async function benchmark(
         }
       });
 
-      const taskResult = await taskExecutor.executeTask(
-        deployment.data.id,
-        fleet.tasks[0],
-        task,
-        {}
-      );
-
-      unsubscribe();
+      const taskResult = await taskExecutor.executeTask({
+        deployedId: deployment.data.id,
+        taskId: fleet.tasks[0].id,
+        agentType: agentName,
+        prompt: task
+      });
 
       result.endTime = Date.now();
       result.duration = result.endTime - result.startTime;

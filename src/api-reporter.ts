@@ -196,44 +196,44 @@ export class APIReporter {
         level = 'error';
         message = typeof event.content === 'string'
           ? event.content
-          : event.content.message || JSON.stringify(event.content);
+          : (event.content as any).message || JSON.stringify(event.content);
         break;
 
       case 'tool_use':
         level = 'info';
-        const tool = event.content;
+        const tool = event.content as any;
 
         // Create human-readable message based on tool type and input
-        let toolMessage = `${tool.name}`;
+        let toolMessage = `${tool.name as string}`;
         if (tool.input) {
           if (tool.name === 'Read') {
-            toolMessage = `Read: ${tool.input.file_path || 'file'}`;
+            toolMessage = `Read: ${(tool.input.file_path as string) || 'file'}`;
           } else if (tool.name === 'Write') {
-            const path = tool.input.file_path || 'file';
-            const contentPreview = tool.input.content ? `(${tool.input.content.length} chars)` : '';
+            const path = (tool.input.file_path as string) || 'file';
+            const contentPreview = tool.input.content ? `(${(tool.input.content as string).length} chars)` : '';
             toolMessage = `Write: ${path} ${contentPreview}`;
           } else if (tool.name === 'Edit') {
-            toolMessage = `Edit: ${tool.input.file_path || 'file'}`;
+            toolMessage = `Edit: ${(tool.input.file_path as string) || 'file'}`;
           } else if (tool.name === 'Bash') {
-            const cmd = tool.input.command || tool.input.description || 'command';
+            const cmd = (tool.input.command as string) || (tool.input.description as string) || 'command';
             toolMessage = `Bash: ${cmd.substring(0, 80)}${cmd.length > 80 ? '...' : ''}`;
           } else if (tool.name === 'Grep') {
-            toolMessage = `Grep: "${tool.input.pattern}" in ${tool.input.path || 'files'}`;
+            toolMessage = `Grep: "${tool.input.pattern as string}" in ${(tool.input.path as string) || 'files'}`;
           } else if (tool.name === 'Glob') {
-            toolMessage = `Glob: ${tool.input.pattern}`;
+            toolMessage = `Glob: ${tool.input.pattern as string}`;
           } else if (tool.name === 'TodoWrite') {
-            const todoCount = tool.input.todos?.length || 0;
+            const todoCount = (tool.input.todos?.length as number) || 0;
             toolMessage = `TodoWrite: ${todoCount} tasks`;
           } else {
-            toolMessage = `${tool.name}: ${tool.status || 'started'}`;
+            toolMessage = `${tool.name as string}: ${(tool.status as string) || 'started'}`;
           }
         }
 
         message = toolMessage;
         metadata = {
-          toolCall: tool.name,
+          toolCall: tool.name as string,
           toolResult: tool.input || tool.result,
-          toolStatus: tool.status
+          toolStatus: tool.status as string
         };
         break;
 
@@ -241,22 +241,22 @@ export class APIReporter {
         level = 'info';
         message = typeof event.content === 'string'
           ? event.content
-          : event.content.activity || JSON.stringify(event.content);
+          : (event.content as any).activity || JSON.stringify(event.content);
         break;
 
       case 'output':
         level = 'info';
-        message = `Output: ${event.content}`;
+        message = `Output: ${event.content as string}`;
         break;
 
       case 'status':
         level = 'info';
-        message = `Status: ${event.content.status} - ${event.content.message || ''}`;
+        message = `Status: ${(event.content as any).status} - ${(event.content as any).message || ''}`;
         break;
 
       case 'progress':
         level = 'debug';
-        message = event.content.message || 'Processing...';
+        message = (event.content as any).message || 'Processing...';
         break;
 
       case 'thinking':
