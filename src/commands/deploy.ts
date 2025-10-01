@@ -9,7 +9,9 @@ export async function deploy(
   carrierPath: string,
   params: string[]
 ): Promise<void> {
-  const fleetId = params[0];
+  // Check if deploying an agent directly
+  const isAgentDeploy = params[0] === 'agent';
+  const targetId = isAgentDeploy ? params[1] : params[0];
   const isDetached = params.includes('--detach') || params.includes('-d');
   const isInteractive = params.includes('--interactive') || params.includes('-i');
 
@@ -17,18 +19,85 @@ export async function deploy(
   const requestParams = params.filter(p =>
     !p.startsWith('--') && !p.startsWith('-')
   );
-  const request = requestParams.slice(1).join(' ');
+  const requestStartIndex = isAgentDeploy ? 2 : 1;
+  const request = requestParams.slice(requestStartIndex).join(' ');
 
-  if (!fleetId || !request) {
+  if (!targetId || !request) {
     console.error('Usage: carrier deploy <fleet-id> "<request>" [options]');
+    console.error('       carrier deploy agent <agent-id> "<request>" [options]');
     console.error('\nOptions:');
     console.error('  --detach, -d         Start detached (run in background)');
     console.error('  --interactive, -i    Enable interactive mode (agent can ask for input)');
     console.error('\nExamples:');
-    console.error('  carrier deploy code "Add dark mode"              # Deploy with live output');
+    console.error('  carrier deploy code "Add dark mode"              # Deploy fleet with live output');
+    console.error('  carrier deploy agent code "Review this file"     # Deploy single agent');
     console.error('  carrier deploy code "Add dark mode" -d           # Deploy in background');
     console.error('  carrier deploy code "Add dark mode" -i           # Deploy with interactive prompts');
     return;
+  }
+
+  // If agent deploy, create a temporary single-task fleet
+  let fleetId = targetId;
+  if (isAgentDeploy) {
+    fleetId = `temp-agent-${targetId}-${Date.now()}`;
+
+    // Create temporary fleet with just this agent
+    const tempFleet = {
+      id: fleetId,
+      description: `Single agent deployment: ${targetId}`,
+      agent: `${targetId}.md`,
+      tasks: [
+        {
+          id: 'main',
+          description: request,
+          agent: `${targetId}.md`
+        }
+      ]
+    };
+
+    // Save temporary fleet
+    const fleetsDir = path.join(carrierPath, 'fleets');
+    const fleetDir = path.join(fleetsDir, fleetId);
+    fs.mkdirSync(fleetDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(fleetDir, `${fleetId}.json`),
+      JSON.stringify(tempFleet, null, 2)
+    );
+
+    // Copy agent file from seed or existing fleets
+    const agentFileName = `${targetId}.md`;
+    let agentContent = null;
+
+    // Try to find agent in seed directory
+    const seedAgentPath = path.join(carrierPath, '..', 'seed', 'agents', agentFileName);
+    if (fs.existsSync(seedAgentPath)) {
+      agentContent = fs.readFileSync(seedAgentPath, 'utf-8');
+    } else {
+      // Try to find agent in existing fleets
+      const existingFleets = fs.readdirSync(fleetsDir);
+      for (const existingFleetId of existingFleets) {
+        const agentPath = path.join(fleetsDir, existingFleetId, agentFileName);
+        if (fs.existsSync(agentPath)) {
+          agentContent = fs.readFileSync(agentPath, 'utf-8');
+          break;
+        }
+      }
+    }
+
+    if (!agentContent) {
+      console.error(`Error: Agent "${targetId}" not found`);
+      console.error(`\nLooked in:`);
+      console.error(`  - seed/agents/${agentFileName}`);
+      console.error(`  - .carrier/fleets/*/$ {agentFileName}`);
+      return;
+    }
+
+    // Copy agent file to temporary fleet directory
+    fs.writeFileSync(path.join(fleetDir, agentFileName), agentContent);
+
+    console.log(`🤖 Deploying agent: ${targetId}`);
+  } else {
+    console.log(`🚀 Deploying fleet: ${targetId}`);
   }
 
   // Interactive mode cannot be used with detached mode
@@ -44,14 +113,29 @@ export async function deploy(
   }
 
   try {
-    console.log(`🚀 Deploying fleet: ${fleetId}`);
     console.log(`📝 Request: ${request}\n`);
 
     const result = await carrier.createDeployed(fleetId, request);
 
     if (result.success && result.data) {
+      // Mark deployment type if it's an agent deployment
+      if (isAgentDeploy) {
+        result.data.deploymentType = 'agent';
+        result.data.agentId = targetId;
+
+        // Update in registry
+        const registry = carrier.loadRegistry();
+        const deploymentIndex = registry.deployedFleets.findIndex(d => d.id === result.data.id);
+        if (deploymentIndex !== -1) {
+          registry.deployedFleets[deploymentIndex] = result.data;
+          carrier.saveRegistry(registry);
+        }
+      } else {
+        result.data.deploymentType = 'fleet';
+      }
+
       console.log(`✅ Deployment created: ${result.data.id}`);
-      console.log(`📦 Fleet: ${fleetId}`);
+      console.log(`📦 ${isAgentDeploy ? 'Agent' : 'Fleet'}: ${isAgentDeploy ? targetId : fleetId}`);
       console.log(`🎯 Starting task: ${result.data.currentTask}\n`);
 
       // Get the first task to execute
