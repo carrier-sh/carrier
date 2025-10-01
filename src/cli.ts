@@ -148,6 +148,9 @@ async function handleCommand() {
       return await cli.start(allParams);
     case 'agent':
       return await cli.agent(allParams);
+    case 'benchmark':
+    case 'bench':
+      return await cli.benchmark(allParams);
     case 'help':
       return await cli.help(params);
     default:

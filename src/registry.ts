@@ -250,6 +250,20 @@ export const COMMANDS: Record<string, Command> = {
     ],
     category: 'fleet',
     requiresInit: true
+  },
+
+  'benchmark': {
+    name: 'benchmark',
+    aliases: ['bench'],
+    description: 'Benchmark agents side-by-side with live comparison',
+    usage: 'carrier benchmark "<task>" --agents=<agent1,agent2,...>',
+    examples: [
+      'carrier benchmark "fix auth bug" --agents=researcher,debugger,security-expert',
+      'carrier benchmark "add feature" --agents=designer,implementer',
+      'carrier bench "optimize code" --agents=analyzer,optimizer  # Same as benchmark (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
   }
 };
 
