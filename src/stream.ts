@@ -12,11 +12,11 @@ import { APIReporter } from './api-reporter.js';
 
 export interface StreamEvent {
   timestamp: string;
-  type: 'agent_activity' | 'tool_use' | 'thinking' | 'output' | 'error' | 'status' | 'progress';
+  type: 'agent_activity' | 'tool_use' | 'thinking' | 'output' | 'error' | 'status' | 'progress' | 'interaction_request' | 'interaction_response';
   deployedId: string;
   taskId: string;
-  content: any;
-  metadata?: Record<string, any>;
+  content: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StreamOptions {
@@ -33,11 +33,29 @@ export class StreamManager extends EventEmitter {
   private apiReporter: APIReporter | null = null;
   private eventBuffer: Map<string, StreamEvent[]> = new Map(); // Buffer events per task
   private batchInterval: NodeJS.Timeout | null = null;
+  private interactionHandler: ((prompt: string) => Promise<string>) | null = null;
 
   constructor(carrierPath: string = '.carrier') {
     super();
     this.carrierPath = carrierPath;
     this.initializeAPIReporter();
+  }
+
+  /**
+   * Set handler for interaction requests (user input during execution)
+   */
+  onInteractionRequest(handler: (prompt: string) => Promise<string>): void {
+    this.interactionHandler = handler;
+  }
+
+  /**
+   * Request user interaction during execution
+   */
+  async requestInteraction(prompt: string): Promise<string> {
+    if (this.interactionHandler) {
+      return await this.interactionHandler(prompt);
+    }
+    return '';
   }
 
   /**

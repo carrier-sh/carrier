@@ -38,12 +38,12 @@ export const COMMANDS: Record<string, Command> = {
     name: 'deploy',
     aliases: ['d', 'run'],
     description: 'Deploy a fleet with a request',
-    usage: 'carrier deploy <fleet-id> "<request>" [--detach]',
+    usage: 'carrier deploy <fleet-id> "<request>" [--detach] [--interactive]',
     examples: [
       'carrier deploy code "Add dark mode to settings"',
-      'carrier deploy code "Add dark mode" --detach  # Run in background',
-      'carrier deploy code "Fix auth bug"',
-      'carrier run code "Write tests"  # Same as deploy (alias)'
+      'carrier deploy code "Add dark mode" --detach       # Run in background',
+      'carrier deploy code "Fix auth bug" --interactive   # Agent can ask for input',
+      'carrier run code "Write tests"                     # Same as deploy (alias)'
     ],
     category: 'core',
     requiresInit: true
