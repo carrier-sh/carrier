@@ -238,6 +238,18 @@ export const COMMANDS: Record<string, Command> = {
     ],
     category: 'core',
     requiresInit: true
+  },
+
+  'agent': {
+    name: 'agent',
+    description: 'Interactive agent builder and management',
+    usage: 'carrier agent <subcommand> [options]',
+    examples: [
+      'carrier agent create --interactive  # Create agent through conversation',
+      'carrier agent list                  # List all custom agents'
+    ],
+    category: 'fleet',
+    requiresInit: true
   }
 };
 

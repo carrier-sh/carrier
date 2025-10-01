@@ -146,6 +146,8 @@ async function handleCommand() {
     case 'resume':
     case 'continue':
       return await cli.start(allParams);
+    case 'agent':
+      return await cli.agent(allParams);
     case 'help':
       return await cli.help(params);
     default:
