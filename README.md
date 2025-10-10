@@ -1,6 +1,7 @@
-Hi! 👋
-
 # Carrier 🚀
+<!-- A powerful orchestration system for Claude Code agents -->
+
+Hi! 👋
 
 **Fleet Orchestration System for Claude Code**
 

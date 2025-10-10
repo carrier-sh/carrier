@@ -90,6 +90,22 @@ export async function watch(
         process.exit(0);
       }, 1000);
     } else {
+      // Keep the process alive while watching, but check deployment status periodically
+      const statusCheckInterval = setInterval(() => {
+        const currentDeployed = carrier.getDeployedFleet(deployedId);
+        if (currentDeployed && currentDeployed.status === 'complete') {
+          clearInterval(statusCheckInterval);
+          streamManager.stopWatch(deployedId);
+          console.log('\n\n🎉 Fleet execution completed!');
+          console.log(`📊 Final Status: ${currentDeployed.status}`);
+          if (currentDeployed.completedAt) {
+            console.log(`⏱️  Completed at: ${new Date(currentDeployed.completedAt).toLocaleString()}`);
+          }
+          console.log('\n✅ Exiting watch session');
+          process.exit(0);
+        }
+      }, 2000); // Check every 2 seconds
+
       // Keep the process alive while watching
       await new Promise(() => {});
     }

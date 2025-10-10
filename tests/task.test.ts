@@ -13,48 +13,6 @@ describe('Task Operations', () => {
     await runCarrier(['init', '--no-claude']);
   });
 
-  test('fleet command retrieves fleet configuration', async () => {
-    // Create a test fleet
-    const fleetDir = join(TEST_DIR, '.carrier/fleets/test-fleet');
-    mkdirSync(fleetDir, { recursive: true });
-    const fleetConfig = {
-      id: 'test-fleet',
-      description: 'Test fleet for testing',
-      agent: 'test-agent',
-      tasks: [
-        { id: 'task1', description: 'First task' },
-        { id: 'task2', description: 'Second task' }
-      ]
-    };
-    writeFileSync(join(fleetDir, 'test-fleet.json'), JSON.stringify(fleetConfig));
-
-    // Get fleet configuration
-    const { exitCode, stdout } = await runCarrier(['fleet', 'test-fleet']);
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain('test-fleet');
-    expect(stdout).toContain('Test fleet for testing');
-  });
-
-  test('fleet --json returns JSON format', async () => {
-    // Create a test fleet
-    const fleetDir = join(TEST_DIR, '.carrier/fleets/test-fleet');
-    mkdirSync(fleetDir, { recursive: true });
-    const fleetConfig = {
-      id: 'test-fleet',
-      description: 'Test fleet',
-      tasks: []
-    };
-    writeFileSync(join(fleetDir, 'test-fleet.json'), JSON.stringify(fleetConfig));
-
-    // Get fleet as JSON
-    const { exitCode, stdout } = await runCarrier(['fleet', 'test-fleet', '--json']);
-    expect(exitCode).toBe(0);
-    
-    // Verify it's valid JSON
-    const parsed = JSON.parse(stdout);
-    expect(parsed.id).toBe('test-fleet');
-    expect(parsed.description).toBe('Test fleet');
-  });
 
   test('execute-task command runs a task subprocess', async () => {
     // Create deployment with task

@@ -75,3 +75,11 @@ export type {
   TaskExecutionSummary
 } from './logs.js';
 
+// Mission types
+export type {
+  Mission,
+  MissionObjective,
+  MissionAction,
+  MissionSuccessCriteria
+} from './mission.js';
+

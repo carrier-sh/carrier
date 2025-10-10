@@ -800,13 +800,13 @@ export class CarrierCore {
 
       // Filter deployments to clean
       const toRemove = registry.deployedFleets.filter(fleet => {
-        // Remove completed and failed fleets
-        // Keep active and awaiting_approval fleets
-        return fleet.status === 'complete' || fleet.status === 'failed';
+        // By default, only remove completed fleets
+        // Keep active, awaiting_approval, pending, cancelled, and failed fleets
+        return fleet.status === 'complete';
       });
 
       const toKeep = registry.deployedFleets.filter(fleet => {
-        return fleet.status === 'active' || fleet.status === 'awaiting_approval';
+        return fleet.status !== 'complete';
       });
 
       // If not forced and there are fleets to remove, show confirmation

@@ -9,11 +9,12 @@
     "carrier": "dist/cli.js"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target bun --format esm && bun build src/dispatch.ts --outdir dist --target bun --format esm",
+    "build": "bun build src/cli.ts --outdir dist --target bun --format esm",
     "dev": "bun src/cli.ts",
     "carrier": "bun src/cli.ts",
     "lint": "tsc --noEmit",
     "test": "bun test",
+    "//test-comment": "This is a test comment added to package.json",
     "test:watch": "bun test --watch",
     "test:fast": "bun test --bail",
     "test:api": "bun test tests/api.test.ts"

@@ -76,6 +76,8 @@ export interface DeployedFleet extends DeploymentInfo {
   currentTask: string;
   currentAgent?: string;  // Store the agent type for current task
   tasks: DeployedTask[];
+  deploymentType?: 'fleet' | 'agent';  // What was deployed - fleet or single agent
+  agentId?: string;  // Original agent ID if deploymentType is 'agent'
 }
 
 // Registry for deployed fleets

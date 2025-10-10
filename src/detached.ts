@@ -20,26 +20,24 @@ export class DetachedExecutor {
       taskId: string;
     }
   ): void {
-    // Ensure logs directory exists
+    // Ensure logs directory exists for PID tracking
     const logsDir = path.join(options.carrierPath, 'deployed', options.deployedId, 'logs');
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
 
-    // Create log files for stdout/stderr
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const outLog = path.join(logsDir, `${options.taskId}_${timestamp}_out.log`);
-    const errLog = path.join(logsDir, `${options.taskId}_${timestamp}_err.log`);
     const pidFile = path.join(logsDir, `${options.taskId}.pid`);
+    const stdoutLog = path.join(logsDir, `${options.taskId}_stdout.log`);
+    const stderrLog = path.join(logsDir, `${options.taskId}_stderr.log`);
 
-    // Open file descriptors for logging
-    const out = fs.openSync(outLog, 'a');
-    const err = fs.openSync(errLog, 'a');
+    // Open log files for stdout/stderr
+    const stdoutFd = fs.openSync(stdoutLog, 'a');
+    const stderrFd = fs.openSync(stderrLog, 'a');
 
     // Spawn the child process in detached mode
     const child = spawn(process.execPath, [scriptPath, ...args], {
       detached: true,
-      stdio: ['ignore', out, err],
+      stdio: ['ignore', stdoutFd, stderrFd],
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -56,12 +54,8 @@ export class DetachedExecutor {
     // Unref the child so parent can exit
     child.unref();
 
-    // Close file descriptors in parent
-    fs.closeSync(out);
-    fs.closeSync(err);
-
     console.log(`📋 Process spawned with PID: ${child.pid}`);
-    console.log(`📂 Logs: ${outLog}`);
+    console.log(`📁 Context will be tracked in: ${options.carrierPath}/deployed/${options.deployedId}/context/`);
   }
 
   /**

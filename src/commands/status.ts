@@ -12,12 +12,14 @@ export async function status(
   carrier: CarrierCore,
   params: string[]
 ): Promise<void> {
-  const deployedId = params[0];
   const isJsonOutput = params.includes('--json');
   const showStreams = params.includes('--streams');
   const showAll = params.includes('--all') || params.includes('-a');
-  
-  if (!deployedId) {
+
+  // Find deployment ID (first non-flag parameter)
+  const deployedId = params.find(p => !p.startsWith('-'));
+
+  if (!deployedId || showAll) {
     // Show all deployments
     try {
       const registry = carrier.loadRegistry();

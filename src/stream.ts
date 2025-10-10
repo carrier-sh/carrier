@@ -8,14 +8,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createReadStream, createWriteStream, WriteStream } from 'fs';
 import * as readline from 'readline';
+import { APIReporter } from './api-reporter.js';
 
 export interface StreamEvent {
   timestamp: string;
-  type: 'agent_activity' | 'tool_use' | 'thinking' | 'output' | 'error' | 'status' | 'progress';
+  type: 'agent_activity' | 'tool_use' | 'thinking' | 'output' | 'error' | 'status' | 'progress' | 'interaction_request' | 'interaction_response';
   deployedId: string;
   taskId: string;
-  content: any;
-  metadata?: Record<string, any>;
+  content: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StreamOptions {
@@ -29,10 +30,94 @@ export class StreamManager extends EventEmitter {
   private activeStreams: Map<string, WriteStream> = new Map();
   private watchers: Map<string, fs.FSWatcher> = new Map();
   private carrierPath: string;
+  private apiReporter: APIReporter | null = null;
+  private eventBuffer: Map<string, StreamEvent[]> = new Map(); // Buffer events per task
+  private batchInterval: NodeJS.Timeout | null = null;
+  private interactionHandler: ((prompt: string) => Promise<string>) | null = null;
 
   constructor(carrierPath: string = '.carrier') {
     super();
     this.carrierPath = carrierPath;
+    this.initializeAPIReporter();
+  }
+
+  /**
+   * Set handler for interaction requests (user input during execution)
+   */
+  onInteractionRequest(handler: (prompt: string) => Promise<string>): void {
+    this.interactionHandler = handler;
+  }
+
+  /**
+   * Request user interaction during execution
+   */
+  async requestInteraction(prompt: string): Promise<string> {
+    if (this.interactionHandler) {
+      return await this.interactionHandler(prompt);
+    }
+    return '';
+  }
+
+  /**
+   * Initialize API reporter from config
+   */
+  private initializeAPIReporter(): void {
+    const apiUrl = process.env.CARRIER_API_URL;
+    const apiKey = process.env.CARRIER_API_KEY;
+    const enabled = process.env.CARRIER_API_REPORTING === 'true' && !!apiUrl;
+
+    if (enabled && apiUrl) {
+      this.apiReporter = new APIReporter({
+        apiUrl,
+        apiKey,
+        enabled: true
+      });
+
+      // Start batch reporting every 2 seconds
+      this.batchInterval = setInterval(() => {
+        this.flushEventBuffers();
+      }, 2000);
+
+      console.log('📡 API reporting enabled:', apiUrl);
+    }
+  }
+
+  /**
+   * Set deployment ID for API reporting
+   */
+  setDeploymentId(deploymentId: string): void {
+    if (this.apiReporter) {
+      this.apiReporter.setDeploymentId(deploymentId);
+    }
+  }
+
+  /**
+   * Flush all buffered events to API
+   */
+  private async flushEventBuffers(): Promise<void> {
+    if (!this.apiReporter) return;
+
+    for (const [taskKey, events] of this.eventBuffer.entries()) {
+      if (events.length === 0) continue;
+
+      const [deployedId, taskId] = taskKey.split(':');
+      await this.apiReporter.batchReportLogs(deployedId, taskId, events);
+
+      // Clear buffer after sending
+      this.eventBuffer.set(taskKey, []);
+    }
+  }
+
+  /**
+   * Clean up resources
+   */
+  destroy(): void {
+    if (this.batchInterval) {
+      clearInterval(this.batchInterval);
+      this.batchInterval = null;
+    }
+    // Flush any remaining events
+    this.flushEventBuffers();
   }
 
   /**
@@ -97,6 +182,48 @@ export class StreamManager extends EventEmitter {
 
     // Emit to listeners
     this.emit('event', fullEvent);
+
+    // Buffer event for API reporting
+    if (this.apiReporter) {
+      if (!this.eventBuffer.has(streamKey)) {
+        this.eventBuffer.set(streamKey, []);
+      }
+      this.eventBuffer.get(streamKey)!.push(fullEvent);
+    }
+  }
+
+  /**
+   * Report task start to API
+   */
+  async reportTaskStart(deployedId: string, taskId: string, agentName: string): Promise<void> {
+    if (this.apiReporter) {
+      await this.apiReporter.reportTaskStart(deployedId, taskId, agentName);
+    }
+  }
+
+  /**
+   * Report task completion to API
+   */
+  async reportTaskComplete(
+    deployedId: string,
+    taskId: string,
+    output: string,
+    status: 'completed' | 'failed',
+    error?: string
+  ): Promise<void> {
+    // Flush any remaining buffered events for this task
+    const streamKey = `${deployedId}:${taskId}`;
+    if (this.apiReporter && this.eventBuffer.has(streamKey)) {
+      const events = this.eventBuffer.get(streamKey)!;
+      if (events.length > 0) {
+        await this.apiReporter.batchReportLogs(deployedId, taskId, events);
+        this.eventBuffer.set(streamKey, []);
+      }
+    }
+
+    if (this.apiReporter) {
+      await this.apiReporter.reportTaskComplete(deployedId, taskId, output, status, error);
+    }
   }
 
   /**
@@ -233,14 +360,14 @@ export class StreamManager extends EventEmitter {
 
     switch (event.type) {
       case 'agent_activity':
-        console.log(`${time} ${taskPrefix} 🤖 ${event.content.activity || event.content}`);
+        console.log(`${time} ${taskPrefix} 🤖 ${(event.content as any).activity || event.content}`);
         break;
 
       case 'tool_use':
-        const tool = event.content;
+        const tool = event.content as any;
         if (tool.name) {
           const params = this.formatToolParams(tool);
-          console.log(`${time} ${taskPrefix} 🔧 ${tool.name}${params ? `: ${params}` : ''}`);
+          console.log(`${time} ${taskPrefix} 🔧 ${tool.name as string}${params ? `: ${params}` : ''}`);
         }
         break;
 
@@ -253,24 +380,24 @@ export class StreamManager extends EventEmitter {
         break;
 
       case 'output':
-        console.log(`${time} ${taskPrefix} 📝 ${event.content}`);
+        console.log(`${time} ${taskPrefix} 📝 ${event.content as string}`);
         break;
 
       case 'error':
-        console.log(`${time} ${taskPrefix} ❌ ${event.content.message || event.content}`);
+        console.log(`${time} ${taskPrefix} ❌ ${(event.content as any).message || event.content}`);
         break;
 
       case 'status':
-        console.log(`${time} ${taskPrefix} ℹ️  ${event.content.message || event.content.status}`);
+        console.log(`${time} ${taskPrefix} ℹ️  ${(event.content as any).message || (event.content as any).status}`);
         break;
 
       case 'progress':
-        const progress = event.content;
+        const progress = event.content as any;
         if (progress.percentage !== undefined) {
-          const bar = this.createProgressBar(progress.percentage);
-          console.log(`${time} ${taskPrefix} ${bar} ${progress.message || ''}`);
+          const bar = this.createProgressBar(progress.percentage as number);
+          console.log(`${time} ${taskPrefix} ${bar} ${(progress.message as string) || ''}`);
         } else {
-          console.log(`${time} ${taskPrefix} ⏳ ${progress.message || 'Processing...'}`);
+          console.log(`${time} ${taskPrefix} ⏳ ${(progress.message as string) || 'Processing...'}`);
         }
         break;
     }
