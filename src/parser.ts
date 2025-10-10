@@ -271,5 +271,13 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'from-start', description: 'Restart from the beginning' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
+  benchmark: [
+    { name: 'agents', description: 'Comma-separated list of agents to benchmark' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  summary: [
+    { name: 'json', description: 'Output in JSON format' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
   help: []
 };

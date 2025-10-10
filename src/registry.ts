@@ -264,6 +264,22 @@ export const COMMANDS: Record<string, Command> = {
     ],
     category: 'core',
     requiresInit: true
+  },
+
+  'summary': {
+    name: 'summary',
+    aliases: ['sum'],
+    description: 'Show deployment summary with tasks, durations, file ops, token usage, and cost estimates',
+    usage: 'carrier summary [deployment-id] [task-id] [--json]',
+    examples: [
+      'carrier summary                     # Show summary of last deployment',
+      'carrier summary 1                   # Show summary of deployment 1',
+      'carrier summary 1 code-analyzer     # Show summary of specific task',
+      'carrier summary --json              # Output in JSON format',
+      'carrier sum                         # Same as summary (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
   }
 };
 

@@ -33,6 +33,7 @@ export class ClaudeProvider implements AIProvider {
   private activityUpdateInterval: number = 500; // ms
   private pendingToolInfo: { name: string; id: string } | null = null;
   private toolInputBuffer: any = {};
+  private toolCallTokenTracking: Map<string, any> = new Map();
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.options = {
@@ -477,30 +478,154 @@ export class ClaudeProvider implements AIProvider {
 
   private async handleResultMessage(message: any, config: TaskConfig): Promise<any> {
     if (message.subtype === 'success') {
+      // Debug: Log the actual message structure to understand what's available
+      if (process.env.CARRIER_DEBUG === 'true') {
+        console.log('[DEBUG] Result message structure:', JSON.stringify(message, null, 2));
+      }
+
+      // Extract token usage from SDK result
+      const tokenUsage = this.extractTokenUsage(message);
+
+      // Update context with token usage
+      if (tokenUsage) {
+        this.updateAgentContext(config.deployedId, config.taskId, {
+          tokenUsage,
+          totalCost: message.total_cost_usd || 0
+        });
+      }
+
       this.streamManager.writeEvent(config.deployedId, config.taskId, {
         type: 'status',
         content: {
           status: 'success',
           message: 'Task completed successfully',
-          turns: message.num_turns || 0
+          turns: message.num_turns || 0,
+          tokenUsage,
+          totalCost: message.total_cost_usd || 0
         }
       });
 
       return {
         success: true,
-        turnCount: message.num_turns
+        turnCount: message.num_turns,
+        tokenUsage,
+        totalCost: message.total_cost_usd || 0
       };
     } else if (message.subtype === 'error_max_turns') {
+      // Still try to capture token usage even on max turns
+      const tokenUsage = this.extractTokenUsage(message);
+      if (tokenUsage) {
+        this.updateAgentContext(config.deployedId, config.taskId, {
+          tokenUsage,
+          totalCost: message.total_cost_usd || 0
+        });
+      }
+
       this.streamManager.writeEvent(config.deployedId, config.taskId, {
         type: 'status',
         content: {
           status: 'max_turns_reached',
-          message: 'Maximum conversation turns reached'
+          message: 'Maximum conversation turns reached',
+          tokenUsage,
+          totalCost: message.total_cost_usd || 0
         }
       });
     }
 
     return null;
+  }
+
+  private extractTokenUsage(message: any): any {
+    // Extract token usage from SDK result message
+    // Try different possible locations for usage data
+    const usage = message.usage || message.tokenUsage || message.token_usage || message.metadata?.usage;
+
+    if (!usage) {
+      // Check if there's token data in other fields
+      if (message.input_tokens || message.output_tokens) {
+        return {
+          input: message.input_tokens || 0,
+          output: message.output_tokens || 0,
+          cacheRead: message.cache_read_tokens || 0,
+          cacheWrite: message.cache_write_tokens || 0,
+          total: (message.input_tokens || 0) + (message.output_tokens || 0)
+        };
+      }
+
+      if (process.env.CARRIER_DEBUG === 'true') {
+        console.log('[DEBUG] No usage field found. Available fields:', Object.keys(message));
+      }
+      return null;
+    }
+
+    const modelUsage = message.modelUsage || {};
+
+    // Calculate totals and breakdown
+    const tokenUsage = {
+      input: usage.input_tokens || 0,
+      output: usage.output_tokens || 0,
+      cacheRead: usage.cache_read_input_tokens || 0,
+      cacheWrite: usage.cache_creation_input_tokens || 0,
+      total: (usage.input_tokens || 0) + (usage.output_tokens || 0)
+    };
+
+    // Add per-model breakdown if available
+    if (Object.keys(modelUsage).length > 0) {
+      tokenUsage['perModel'] = {};
+      for (const [modelName, modelData] of Object.entries(modelUsage)) {
+        if (modelData && typeof modelData === 'object') {
+          tokenUsage['perModel'][modelName] = {
+            input: (modelData as any).inputTokens || 0,
+            output: (modelData as any).outputTokens || 0
+          };
+        }
+      }
+    }
+
+    return tokenUsage;
+  }
+
+  private estimateToolTokens(toolResult: any): number {
+    // Estimate token usage based on input/output size
+    // This is a rough approximation since SDK doesn't provide per-tool metrics
+    try {
+      const inputStr = JSON.stringify(toolResult.input || {});
+      const resultStr = JSON.stringify(toolResult.result || {});
+      // Rough estimate: 4 chars per token on average
+      return Math.ceil((inputStr.length + resultStr.length) / 4);
+    } catch {
+      return 0;
+    }
+  }
+
+  private updateToolTokensInContext(deployedId: string, taskId: string, toolId: string, tokenInfo: any): void {
+    const carrierPath = this.options.carrierPath || '.carrier';
+    const contextPath = path.join(
+      carrierPath,
+      'deployed',
+      deployedId,
+      'context',
+      `${taskId}.json`
+    );
+
+    if (!fs.existsSync(contextPath)) {
+      return;
+    }
+
+    try {
+      const context = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
+
+      // Update tool-specific token tracking
+      if (!context.toolCallTokens) {
+        context.toolCallTokens = {};
+      }
+      context.toolCallTokens[toolId] = tokenInfo;
+
+      // Write back
+      fs.writeFileSync(contextPath, JSON.stringify(context, null, 2));
+    } catch (e) {
+      // Ignore errors in context update
+    }
   }
 
   private flushMessageBuffer(deployedId: string, taskId: string): void {
@@ -750,9 +875,12 @@ Remember to use the Write tool to save your final output in this structured form
       filesAccessed: [] as any[],
       commandsExecuted: [] as any[],
       toolsUsed: {} as Record<string, number>,
+      toolCallTokens: {} as Record<string, any>,
       keyDecisions: [] as string[],
       lastActivity: '',
-      status: 'running'
+      status: 'running',
+      tokenUsage: null as any,
+      totalCost: 0
     };
 
     // Save initial context
@@ -908,6 +1036,9 @@ Remember to use the Write tool to save your final output in this structured form
         filesAccessed: deduplicatedFiles,
         commandsExecuted: deduplicatedCommands,
         toolsUsed: context.toolsUsed || {},
+        tokenUsage: context.tokenUsage || null,
+        toolCallTokens: context.toolCallTokens || {},
+        totalCost: context.totalCost || 0,
         summary: context.keyDecisions?.join('. ') || 'Task completed successfully'
       };
 

@@ -151,6 +151,9 @@ async function handleCommand() {
     case 'benchmark':
     case 'bench':
       return await cli.benchmark(allParams);
+    case 'summary':
+    case 'sum':
+      return await cli.summary(allParams);
     case 'help':
       return await cli.help(params);
     default:

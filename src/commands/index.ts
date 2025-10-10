@@ -18,3 +18,4 @@ export { stop } from './stop.js';
 export { start } from './start.js';
 export { agent } from './agent.js';
 export { benchmark } from './benchmark.js';
+export { summary } from './summary.js';
