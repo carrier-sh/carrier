@@ -279,5 +279,21 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'json', description: 'Output in JSON format' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
+  agent: [
+    { name: 'interactive', description: 'Use interactive mode for agent creation', shorthand: 'i' },
+    { name: 'name', description: 'Agent name (required for non-interactive)' },
+    { name: 'purpose', description: 'What the agent should do (required for non-interactive)' },
+    { name: 'files', description: 'File patterns to focus on (default: "*.ts,*.js")' },
+    { name: 'read-only', description: 'Make agent read-only (no modifications)' },
+    { name: 'tone', description: 'Communication style: concise|detailed|friendly|formal' },
+    { name: 'format', description: 'Output format: markdown|json|plain' },
+    { name: 'frameworks', description: 'Frameworks or standards to check' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
+  compare: [
+    { name: 'task', description: 'Filter by task description/type' },
+    { name: 'json', description: 'Output comparison in JSON format' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
   help: []
 };

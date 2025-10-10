@@ -330,13 +330,8 @@ export class ClaudeProvider implements AIProvider {
             }
             this.toolInputBuffer[this.pendingToolInfo.id] += event.delta.partial_json;
           }
-
-          this.streamManager.writeEvent(deployedId, taskId, {
-            type: 'progress',
-            content: {
-              message: 'Preparing tool parameters...'
-            }
-          });
+          // Note: We don't emit progress events here to avoid spam.
+          // Tool start is already shown via 'content_block_start' event.
         }
         break;
 

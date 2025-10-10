@@ -154,6 +154,10 @@ async function handleCommand() {
     case 'summary':
     case 'sum':
       return await cli.summary(allParams);
+    case 'compare':
+    case 'comp':
+    case 'vs':
+      return await cli.compare(allParams);
     case 'help':
       return await cli.help(params);
     default:

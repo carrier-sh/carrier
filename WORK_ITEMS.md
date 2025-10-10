@@ -272,14 +272,15 @@ Runs agent against test cases, shows pass/fail
 ### 10. Documentation Gaps
 **Priority:** P2
 **Impact:** Hard to onboard
-**Status:** Minimal docs
+**Status:** ✅ COMPLETE
 
-**What needs writing:**
-- Agent creation guide
-- Fleet design patterns
-- Troubleshooting guide
-- API documentation
-- Architecture deep-dive
+**What was written:**
+- ✅ Agent creation guide (docs/AGENT_CREATION_GUIDE.md)
+- ✅ Fleet design patterns (docs/FLEET_PATTERNS.md)
+- ✅ Troubleshooting guide (docs/TROUBLESHOOTING.md)
+- ✅ Documentation index (docs/README.md)
+- ⏳ API documentation (future)
+- ⏳ Architecture deep-dive (future)
 
 ---
 
@@ -345,7 +346,7 @@ For each fix:
 
 ---
 
-**Last Test Results:** 2025-10-10 (Updated after dogfooding session)
+**Last Test Results:** 2025-10-10 (Updated after dogfooding session #2)
 - ✅ Telemetry capture works
 - ✅ Real-time streaming works
 - ✅ Context tracking works
@@ -354,7 +355,15 @@ For each fix:
 - ✅ Unified summary command IMPLEMENTED - Shows tasks, files, tokens, and cost
 - ✅ Benchmark edge cases FIXED - Validation, cleanup, and better error messages
 - ✅ Benchmark flag parsing FIXED - Parser now recognizes --agents flag
+- ✅ Stream verbosity FIXED - Removed excessive "Preparing tool parameters..." messages
+- ✅ Non-interactive agent builder IMPLEMENTED - Full CLI flag support with fallback to interactive mode
+- ✅ Historical comparison command IMPLEMENTED - Compare agents across past deployments with metrics
 
 **Bugs Found & Fixed During Testing:**
 1. Benchmark command flags not registered in parser (src/parser.ts:274-277)
 2. Benchmark flag parsing didn't handle separated values (src/commands/benchmark.ts:34-45)
+3. Stream spam from input_json_delta events (src/providers/claude-provider.ts:324-335)
+4. Agent command flags not registered in parser (src/parser.ts:282-292)
+5. History service used wrong metadata field (metadata.agents vs metadata.tasks) (src/services/history.ts:92)
+6. History service used wrong registry structure (needed registry.deployedFleets) (src/services/history.ts:77)
+7. History service checked wrong status values (complete vs completed) (src/services/history.ts:218,246)

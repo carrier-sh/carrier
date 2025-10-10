@@ -246,6 +246,8 @@ export const COMMANDS: Record<string, Command> = {
     usage: 'carrier agent <subcommand> [options]',
     examples: [
       'carrier agent create --interactive  # Create agent through conversation',
+      'carrier agent create --name security-reviewer --purpose "Review TS for security issues" --files "*.ts,*.tsx" --read-only',
+      'carrier agent create --name formatter --purpose "Format code with prettier" --tone concise --format plain',
       'carrier agent list                  # List all custom agents'
     ],
     category: 'fleet',
@@ -277,6 +279,22 @@ export const COMMANDS: Record<string, Command> = {
       'carrier summary 1 code-analyzer     # Show summary of specific task',
       'carrier summary --json              # Output in JSON format',
       'carrier sum                         # Same as summary (alias)'
+    ],
+    category: 'core',
+    requiresInit: true
+  },
+
+  'compare': {
+    name: 'compare',
+    aliases: ['comp', 'vs'],
+    description: 'Compare two agents based on historical deployment data',
+    usage: 'carrier compare <agent1> <agent2> [--task "<filter>"] [--json]',
+    examples: [
+      'carrier compare code-analyzer code-executor                    # Compare all deployments',
+      'carrier compare researcher debugger --task "fix auth"          # Filter by task type',
+      'carrier compare security-expert implementer --task review      # Filter by "review" tasks',
+      'carrier compare agent1 agent2 --json                           # Output as JSON',
+      'carrier vs agent1 agent2                                       # Same as compare (alias)'
     ],
     category: 'core',
     requiresInit: true

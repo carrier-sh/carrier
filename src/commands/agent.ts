@@ -19,18 +19,127 @@ export async function agent(
 ): Promise<void> {
   const subcommand = params[0];
 
-  if (subcommand === 'create' && params.includes('--interactive')) {
-    await createAgentInteractive(carrierPath);
+  if (subcommand === 'create') {
+    // Check if interactive mode is requested
+    if (params.includes('--interactive')) {
+      await createAgentInteractive(carrierPath);
+    } else {
+      // Try to create agent from CLI flags
+      await createAgentFromFlags(carrierPath, params);
+    }
   } else if (subcommand === 'list') {
     await listAgents(carrierPath);
   } else {
     console.error('Usage:');
     console.error('  carrier agent create --interactive    Create agent through conversation');
+    console.error('  carrier agent create --name <name> --purpose "<purpose>" [options]');
     console.error('  carrier agent list                    List all custom agents');
+    console.error('\nOptions for non-interactive mode:');
+    console.error('  --name <name>          Agent name (required)');
+    console.error('  --purpose "<purpose>"  What the agent should do (required)');
+    console.error('  --files <patterns>     File patterns to focus on (default: "*.ts,*.js")');
+    console.error('  --read-only           Make agent read-only (no modifications)');
+    console.error('  --tone <style>        Communication style: concise|detailed|friendly|formal (default: concise)');
+    console.error('  --format <format>     Output format: markdown|json|plain (default: markdown)');
+    console.error('  --frameworks "<list>" Frameworks or standards to check (optional)');
     console.error('\nExamples:');
     console.error('  carrier agent create --interactive');
+    console.error('  carrier agent create --name security-reviewer --purpose "Review TS for security issues" --files "*.ts,*.tsx" --read-only');
+    console.error('  carrier agent create --name formatter --purpose "Format code with prettier" --tone concise --format plain');
     console.error('  carrier agent list');
   }
+}
+
+async function createAgentFromFlags(carrierPath: string, params: string[]): Promise<void> {
+  // Parse flags from params
+  const flags: Record<string, string | boolean> = {};
+  let i = 1; // Skip 'create' subcommand
+
+  while (i < params.length) {
+    const param = params[i];
+    if (param.startsWith('--')) {
+      const flagName = param.slice(2);
+
+      // Check for boolean flags
+      if (flagName === 'read-only') {
+        flags[flagName] = true;
+        i++;
+      } else if (i + 1 < params.length && !params[i + 1].startsWith('--')) {
+        // Flag with value
+        flags[flagName] = params[i + 1];
+        i += 2;
+      } else {
+        // Flag without value
+        flags[flagName] = true;
+        i++;
+      }
+    } else {
+      i++;
+    }
+  }
+
+  // Validate required flags
+  if (!flags.name || !flags.purpose) {
+    // Fall back to interactive mode if required flags are missing
+    console.log('Missing required flags (--name and --purpose). Switching to interactive mode...\n');
+    return await createAgentInteractive(carrierPath);
+  }
+
+  // Build config from flags
+  const config: AgentConfig & { agentName: string } = {
+    agentName: flags.name as string,
+    purpose: flags.purpose as string,
+    filePatterns: flags.files
+      ? (flags.files as string).split(',').map(p => p.trim())
+      : ['*.ts', '*.js'],
+    canModify: !flags['read-only'],
+    tone: (flags.tone as 'concise' | 'detailed' | 'friendly' | 'formal') || 'concise',
+    outputFormat: (flags.format as 'markdown' | 'json' | 'plain') || 'markdown',
+    frameworks: flags.frameworks as string || undefined
+  };
+
+  // Validate agent name
+  if (!/^[a-z0-9-]+$/.test(config.agentName)) {
+    console.error('❌ Error: Agent name must contain only lowercase letters, numbers, and hyphens');
+    return;
+  }
+
+  // Validate tone
+  if (flags.tone && !['concise', 'detailed', 'friendly', 'formal'].includes(flags.tone as string)) {
+    console.error('❌ Error: Invalid tone. Must be one of: concise, detailed, friendly, formal');
+    return;
+  }
+
+  // Validate format
+  if (flags.format && !['markdown', 'json', 'plain'].includes(flags.format as string)) {
+    console.error('❌ Error: Invalid format. Must be one of: markdown, json, plain');
+    return;
+  }
+
+  // Generate agent markdown
+  const agentMarkdown = generateAgentMarkdown(config);
+
+  // Save to .carrier/agents/
+  const agentsDir = path.join(carrierPath, 'agents');
+  if (!fs.existsSync(agentsDir)) {
+    fs.mkdirSync(agentsDir, { recursive: true });
+  }
+
+  const agentPath = path.join(agentsDir, `${config.agentName}.md`);
+
+  // Check if agent already exists
+  if (fs.existsSync(agentPath)) {
+    console.error(`❌ Error: Agent '${config.agentName}' already exists at ${agentPath}`);
+    return;
+  }
+
+  fs.writeFileSync(agentPath, agentMarkdown, 'utf-8');
+
+  console.log('✅ Agent created successfully!');
+  console.log(`📁 Saved to: ${agentPath}`);
+  console.log('\n💡 Usage:');
+  console.log(`   Add to a fleet's task with: "agent": "${config.agentName}.md"`);
+  console.log(`   Or create a new fleet with this agent`);
 }
 
 async function createAgentInteractive(carrierPath: string): Promise<void> {
