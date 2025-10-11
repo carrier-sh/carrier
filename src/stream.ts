@@ -15,6 +15,7 @@ export interface StreamEvent {
   type: 'agent_activity' | 'tool_use' | 'thinking' | 'output' | 'error' | 'status' | 'progress' | 'interaction_request' | 'interaction_response';
   deployedId: string;
   taskId: string;
+  runId?: string; // Unique ID for this run/session (ISO timestamp)
   content: unknown;
   metadata?: Record<string, unknown>;
 }
@@ -34,11 +35,26 @@ export class StreamManager extends EventEmitter {
   private eventBuffer: Map<string, StreamEvent[]> = new Map(); // Buffer events per task
   private batchInterval: NodeJS.Timeout | null = null;
   private interactionHandler: ((prompt: string) => Promise<string>) | null = null;
+  private currentRunId: string | null = null; // Track current run session
 
   constructor(carrierPath: string = '.carrier') {
     super();
     this.carrierPath = carrierPath;
     this.initializeAPIReporter();
+  }
+
+  /**
+   * Set run ID for the current execution session
+   */
+  setRunId(runId: string): void {
+    this.currentRunId = runId;
+  }
+
+  /**
+   * Get current run ID
+   */
+  getRunId(): string | null {
+    return this.currentRunId;
   }
 
   /**
@@ -168,6 +184,7 @@ export class StreamManager extends EventEmitter {
       timestamp: new Date().toISOString(),
       deployedId,
       taskId,
+      runId: this.currentRunId || undefined, // Include current runId if set
       type: event.type || 'agent_activity',
       content: event.content,
       metadata: event.metadata

@@ -58,6 +58,11 @@ export class ClaudeProvider implements AIProvider {
     console.log(`📊 Real-time streaming: ENABLED`);
     console.log('');
 
+    // Generate runId for this execution session (ISO timestamp)
+    const runId = new Date().toISOString();
+    this.streamManager.setRunId(runId);
+    console.log(`🔄 Run ID: ${runId}`);
+
     // Start streaming for this task
     this.streamManager.startStream(config.deployedId, config.taskId);
 
