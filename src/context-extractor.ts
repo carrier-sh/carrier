@@ -52,8 +52,37 @@ export class ContextExtractor {
   async extractDeploymentContext(deployedId: string): Promise<DeploymentContext> {
     const deployedPath = path.join(this.carrierPath, 'deployed', deployedId);
 
+    // Check if deployment exists
+    if (!fs.existsSync(deployedPath)) {
+      // Return empty context for non-existent deployments
+      return {
+        deployedId,
+        fleetId: '',
+        originalRequest: '',
+        tasksCompleted: [],
+        currentTask: '',
+        taskContexts: new Map(),
+        globalFilesModified: new Set(),
+        globalFilesRead: new Set()
+      };
+    }
+
     // Load metadata
     const metadataPath = path.join(deployedPath, 'metadata.json');
+    if (!fs.existsSync(metadataPath)) {
+      // Return empty context if no metadata
+      return {
+        deployedId,
+        fleetId: '',
+        originalRequest: '',
+        tasksCompleted: [],
+        currentTask: '',
+        taskContexts: new Map(),
+        globalFilesModified: new Set(),
+        globalFilesRead: new Set()
+      };
+    }
+
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
 
     // Load original request
