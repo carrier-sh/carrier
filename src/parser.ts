@@ -259,6 +259,12 @@ export const COMMAND_FLAGS: Record<string, CommandFlag[]> = {
     { name: 'all', description: 'Stop all active deployments' },
     { name: 'help', description: 'Show help for this command', shorthand: 'h' }
   ],
+  'start': [
+    { name: 'force', description: 'Start without confirmation', shorthand: 'f' },
+    { name: 'detach', description: 'Start in background (don\'t attach to output)', shorthand: 'd' },
+    { name: 'from-start', description: 'Restart from the beginning' },
+    { name: 'help', description: 'Show help for this command', shorthand: 'h' }
+  ],
   'resume': [
     { name: 'force', description: 'Resume without confirmation', shorthand: 'f' },
     { name: 'detach', description: 'Resume in background (don\'t attach to output)', shorthand: 'd' },
