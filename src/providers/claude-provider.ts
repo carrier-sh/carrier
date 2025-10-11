@@ -33,6 +33,7 @@ export class ClaudeProvider implements AIProvider {
   private activityUpdateInterval: number = 500; // ms
   private pendingToolInfo: { name: string; id: string } | null = null;
   private toolInputBuffer: any = {};
+  private currentRunId: string | null = null; // Track current run ID for context storage
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.options = {
@@ -60,6 +61,7 @@ export class ClaudeProvider implements AIProvider {
 
     // Generate runId for this execution session (ISO timestamp)
     const runId = new Date().toISOString();
+    this.currentRunId = runId; // Store for context methods
     this.streamManager.setRunId(runId);
     console.log(`🔄 Run ID: ${runId}`);
 
@@ -736,18 +738,41 @@ Remember to use the Write tool to save your final output in this structured form
     return logPath;
   }
 
-  protected generateAgentContext(config: TaskConfig): void {
+  /**
+   * Get the context file path for the current run
+   */
+  private getContextPath(deployedId: string): string | null {
+    if (!this.currentRunId) {
+      return null;
+    }
+
     const carrierPath = this.options.carrierPath || '.carrier';
-    const contextPath = path.join(
+    return path.join(
       carrierPath,
       'deployed',
-      config.deployedId,
-      'context',
-      `${config.taskId}.json`
+      deployedId,
+      'runs',
+      this.currentRunId,
+      'context.json'
     );
+  }
+
+  protected generateAgentContext(config: TaskConfig): void {
+    const contextPath = this.getContextPath(config.deployedId);
+    if (!contextPath) {
+      console.warn('⚠️  No runId set - context will not be saved');
+      return;
+    }
+
+    // Ensure run directory exists
+    const runDir = path.dirname(contextPath);
+    if (!fs.existsSync(runDir)) {
+      fs.mkdirSync(runDir, { recursive: true });
+    }
 
     // Initialize context structure
     const context = {
+      runId: this.currentRunId,
       taskId: config.taskId,
       agentType: config.agentType,
       deployedId: config.deployedId,
@@ -762,17 +787,12 @@ Remember to use the Write tool to save your final output in this structured form
 
     // Save initial context
     fs.writeFileSync(contextPath, JSON.stringify(context, null, 2));
+    console.log(`📝 Context initialized: runs/${this.currentRunId}/context.json`);
   }
 
   protected updateAgentContext(deployedId: string, taskId: string, update: any): void {
-    const carrierPath = this.options.carrierPath || '.carrier';
-    const contextPath = path.join(
-      carrierPath,
-      'deployed',
-      deployedId,
-      'context',
-      `${taskId}.json`
-    );
+    const contextPath = this.getContextPath(deployedId);
+    if (!contextPath) return;
 
     if (!fs.existsSync(contextPath)) {
       return;
@@ -792,14 +812,8 @@ Remember to use the Write tool to save your final output in this structured form
   }
 
   protected updateContextFromTool(deployedId: string, taskId: string, toolName: string, toolInput: any): void {
-    const carrierPath = this.options.carrierPath || '.carrier';
-    const contextPath = path.join(
-      carrierPath,
-      'deployed',
-      deployedId,
-      'context',
-      `${taskId}.json`
-    );
+    const contextPath = this.getContextPath(deployedId);
+    if (!contextPath) return;
 
     if (!fs.existsSync(contextPath)) {
       return;

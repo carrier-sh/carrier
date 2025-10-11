@@ -149,28 +149,27 @@ export async function start(
   let contextPrompt = deployed.request; // Start with original request
 
   if (!fromStart) {
-    console.log('📚 Extracting and compacting context from previous execution...');
+    console.log('📚 Extracting context from previous execution...');
 
     const contextExtractor = new ContextExtractor(carrierPath);
 
     try {
-      // First, compact all existing context files in-place
-      console.log('🗜️  Compacting context files...');
-      contextExtractor.compactAllTaskContexts(deployedId);
-
-      // Extract context from compacted files
+      // Extract context from original files (non-destructive)
+      // This reads all task context JSON files and aggregates them in-memory
       const deploymentContext = await contextExtractor.extractDeploymentContext(deployedId);
 
-      // Generate compact but effective resumption prompt
+      // Generate compact resumption prompt (in-memory, doesn't modify files)
       contextPrompt = contextExtractor.generateResumptionPrompt(deploymentContext);
 
-      // Save context cache for future use
+      // Save compacted summary to cache for fast future access
+      // Original context files remain untouched for audit/debugging
       await contextExtractor.saveContextCache(deployedId);
 
-      console.log('✓ Smart context extracted:');
+      console.log('✓ Context extracted and compacted:');
+      console.log(`  - Original context: ${deploymentContext.tasksCompleted.length} tasks, full detail preserved`);
       console.log(`  - Files read: ${deploymentContext.globalFilesRead.size}`);
       console.log(`  - Files modified: ${deploymentContext.globalFilesModified.size}`);
-      console.log(`  - Tasks completed: ${deploymentContext.tasksCompleted.length}`);
+      console.log(`  - Compacted prompt: ${(contextPrompt.length / 1024).toFixed(1)} KB`);
 
       // Add task-specific context if starting from a specific task
       const currentTaskContext = deploymentContext.taskContexts.get(taskToStart.id);
